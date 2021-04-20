@@ -1,32 +1,19 @@
-# k8s-bull-autoscaler
+# Searchkings Gulp GCS Upload
 
-CLI to autoscale k8s pods based on Bull queue size
+> Upload files to Google Cloud Storage with Gulp
 
-## Example Deployment
+## Install
 
-```yaml
-apiVersion: extensions/v1beta1
-kind: Deployment
-metadata:
-  name: example-queue-autoscaler
-spec:
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: example-queue-autoscaler
-        environment: production
-    spec:
-      containers:
-        - name: example-queue-autoscaler
-          image: rosslavery/k8s-bull-autoscaler:latest
-          args:
-            - --queue-url=http://example-api/queues/count
-            - --k8s-deployment=example-worker
-            - --poll-period=10000
-            - --scale-down-wait=60000
-            - --scale-up-wait=60000
-            - --messages-per-pod=300
-            - --min-pods=1
-            - --max-pods=5
+```
+npm install --save @searchkings/gulp-gcs-upload
+```
+
+## Development
+
+```
+npm install
+```
+
+```
+npm start
 ```

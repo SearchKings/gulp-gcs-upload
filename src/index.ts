@@ -2,17 +2,16 @@ import {
   Bucket,
   GetFileMetadataResponse,
   Storage,
-  StorageOptions,
+  StorageOptions
 } from '@google-cloud/storage';
 import fs from 'fs';
 import through from 'through2';
 import zlib from 'zlib';
 import crypto from 'crypto';
 import mime from 'mime-types';
-import { pascalCase } from 'pascal-case';
 import PluginError from 'plugin-error';
 
-const PLUGIN_NAME = 'gulp-awspublish';
+const PLUGIN_NAME = 'gulp-gcs-upload';
 
 /**
  * calculate file hash
@@ -22,9 +21,9 @@ const PLUGIN_NAME = 'gulp-awspublish';
  * @api private
  */
 
-function md5Hash(buf) {
+const md5Hash = (buf): string => {
   return crypto.createHash('md5').update(buf).digest('hex');
-}
+};
 
 /**
  * Determine the content type of a file based on charset and mime type.
@@ -33,33 +32,14 @@ function md5Hash(buf) {
  *
  * @api private
  */
-
-function getContentType(file) {
-  var mimeType =
+const getContentType = (file): string => {
+  const mimeType: string =
     mime.lookup(file.unzipPath || file.path) || 'application/octet-stream';
-  var charset = mime.charset(mimeType);
+
+  const charset: string | false = mime.charset(mimeType);
 
   return charset ? mimeType + '; charset=' + charset.toLowerCase() : mimeType;
-}
-
-/**
- * Turn the HTTP style headers into AWS Object params
- */
-
-function toGcsParams(file) {
-  var params: any = {};
-
-  var headers = file.gcs.headers || {};
-
-  for (var header in headers) {
-    params[pascalCase(header)] = headers[header];
-  }
-
-  params.Key = file.gcs.path;
-  params.Body = file.contents;
-
-  return params;
-}
+};
 
 /**
  * init file gcs hash
@@ -69,14 +49,14 @@ function toGcsParams(file) {
  * @api private
  */
 
-function initFile(file) {
+const initFile = file => {
   if (!file.gcs) {
     file.gcs = {};
     file.gcs.headers = {};
     file.gcs.path = file.relative.replace(/\\/g, '/');
   }
   return file;
-}
+};
 
 /**
  * create a through stream that gzip files
@@ -90,13 +70,20 @@ function initFile(file) {
  * @return {Stream}
  * @api public
  */
-export const gzip = (options) => {
-  if (!options) options = {};
-  if (!options.ext) options.ext = '';
+export const gzip = options => {
+  if (!options) {
+    options = {};
+  }
+
+  if (!options.ext) {
+    options.ext = '';
+  }
 
   return through.obj(function (file, enc, cb) {
     // Do nothing if no contents
-    if (file.isNull()) return cb();
+    if (file.isNull()) {
+      return cb();
+    }
 
     // streams not supported
     if (file.isStream()) {
@@ -112,17 +99,22 @@ export const gzip = (options) => {
       initFile(file);
 
       // zip file
-      zlib.gzip(file.contents, options, function (err, buf) {
-        if (err) return cb(err);
-        if (options.smaller && buf.length >= file.contents.length)
+      zlib.gzip(file.contents, options, (err, buf) => {
+        if (err) {
+          return cb(err);
+        }
+
+        if (options.smaller && buf.length >= file.contents.length) {
           return cb(err, file);
+        }
+
         // add content-encoding header
         file.gcs.headers['Content-Encoding'] = 'gzip';
         file.unzipPath = file.path;
         file.path += options.ext;
         file.gcs.path += options.ext;
         file.contents = buf;
-        cb(err, file);
+        return cb(err, file);
       });
     }
   });
@@ -150,7 +142,7 @@ class Publisher {
     this.cacheFile =
       cacheOptions && cacheOptions.cacheFileName
         ? cacheOptions.cacheFileName
-        : '.awspublish-' + bucketName;
+        : '.gcspublish-' + bucketName;
 
     // load cache
     try {
@@ -173,10 +165,12 @@ class Publisher {
   cache() {
     let counter = 0;
 
-    var stream = through.obj((file, enc, cb) => {
+    const stream = through.obj((file, enc, cb) => {
       if (file.gcs && file.gcs.path) {
         // do nothing for file already cached
-        if (file.gcs.state === 'cache') return cb(null, file);
+        if (file.gcs.state === 'cache') {
+          return cb(null, file);
+        }
 
         // remove deleted
         if (file.gcs.state === 'delete') {
@@ -200,7 +194,7 @@ class Publisher {
   }
 
   publish(headers, options) {
-    var _this = this;
+    const _this = this;
 
     // init opts
     if (!options) options = { force: false };
@@ -209,10 +203,12 @@ class Publisher {
     if (!headers) headers = {};
 
     return through.obj(function (file, enc, cb) {
-      var header, etag;
+      let header, etag;
 
       // Do nothing if no contents
-      if (file.isNull()) return cb();
+      if (file.isNull()) {
+        return cb();
+      }
 
       // streams not supported
       if (file.isStream()) {
@@ -231,7 +227,9 @@ class Publisher {
         etag = '"' + md5Hash(file.contents) + '"';
 
         // delete - stop here
-        if (file.gcs.state === 'delete') return cb(null, file);
+        if (file.gcs.state === 'delete') {
+          return cb(null, file);
+        }
 
         // check if file is identical as the one in cache
         if (!options.force && _this.fileCache[file.gcs.path] === etag) {
@@ -250,22 +248,26 @@ class Publisher {
         // add extra headers
         for (header in headers) file.gcs.headers[header] = headers[header];
 
-        if (options.simulate) return cb(null, file);
+        if (options.simulate) {
+          return cb(null, file);
+        }
 
         // get gcs headers
         _this.client
           .file(file.gcs.path)
-          .getMetadata(function (err, [res]: GetFileMetadataResponse) {
+          .getMetadata((err, [res]: GetFileMetadataResponse) => {
             //ignore 403 and 404 errors since we're checking if a file exists on gcs
-            if (err && [403, 404].indexOf(err.statusCode) < 0) return cb(err);
+            if (err && [403, 404].indexOf(err.statusCode) < 0) {
+              return cb(err);
+            }
 
             res = res || {};
 
             // skip: no updates allowed
-            var noUpdate = options.createOnly && res.etag;
+            const noUpdate = options.createOnly && res.etag;
 
             // skip: file are identical
-            var noChange = !options.force && res.etag === etag;
+            const noChange = !options.force && res.etag === etag;
 
             if (noUpdate || noChange) {
               file.gcs.state = 'skip';
@@ -277,8 +279,10 @@ class Publisher {
             } else {
               file.gcs.state = res.etag ? 'update' : 'create';
 
-              _this.client.upload(file.gcs.path, function (err) {
-                if (err) return cb(err);
+              _this.client.upload(file.gcs.path, err => {
+                if (err) {
+                  return cb(err);
+                }
 
                 file.gcs.date = new Date();
                 file.gcs.etag = etag;
