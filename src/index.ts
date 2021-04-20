@@ -9,6 +9,7 @@ import through from 'through2';
 import zlib from 'zlib';
 import crypto from 'crypto';
 import mime from 'mime-types';
+import { pascalCase } from 'pascal-case';
 import PluginError from 'plugin-error';
 
 const PLUGIN_NAME = 'gulp-gcs-upload';
@@ -40,6 +41,24 @@ const getContentType = (file): string => {
 
   return charset ? mimeType + '; charset=' + charset.toLowerCase() : mimeType;
 };
+
+// /**
+//  * Turn the HTTP style headers into AWS Object params
+//  */
+// const toGcsParams = file => {
+//   const params: any = {};
+
+//   const headers = file.gcs.headers || {};
+
+//   for (const header in headers) {
+//     params[pascalCase(header)] = headers[header];
+//   }
+
+//   params.Key = file.gcs.path;
+//   params.Body = file.contents;
+
+//   return params;
+// };
 
 /**
  * init file gcs hash
@@ -85,7 +104,7 @@ export const gzip = options => {
       return cb();
     }
 
-    // streams not supported
+    // Streams not supported
     if (file.isStream()) {
       this.emit(
         'error',
@@ -94,11 +113,11 @@ export const gzip = options => {
       return cb();
     }
 
-    // check if file.contents is a `Buffer`
+    // Check if file.contents is a `Buffer`
     if (file.isBuffer()) {
       initFile(file);
 
-      // zip file
+      // Zip file
       zlib.gzip(file.contents, options, (err, buf) => {
         if (err) {
           return cb(err);
@@ -108,7 +127,7 @@ export const gzip = options => {
           return cb(err, file);
         }
 
-        // add content-encoding header
+        // Add content-encoding header
         file.gcs.headers['Content-Encoding'] = 'gzip';
         file.unzipPath = file.path;
         file.path += options.ext;
@@ -121,70 +140,62 @@ export const gzip = options => {
 };
 
 class Publisher {
-  private config: StorageOptions;
   private client: Bucket;
+  private config: StorageOptions;
+  private uploadBase: string;
   private cacheFile: string;
   private fileCache: { [key: string]: string };
 
   constructor(
-    bucketName: string,
-    storageOptions: StorageOptions,
-    cacheOptions: {
-      cacheFileName: string;
-    }
+    { bucketName, uploadBase, cacheFile },
+    storageOptions: StorageOptions
   ) {
     if (!bucketName) {
-      throw new Error('Missing `bucketName` config value.');
+      throw new Error('Missing bucket name');
     }
 
     this.config = storageOptions;
-    this.client = new Storage(this.config).bucket(`${bucketName}`);
+    this.uploadBase = uploadBase;
+    this.client = new Storage(this.config).bucket(bucketName);
 
-    // init Cache file
-    this.cacheFile =
-      cacheOptions && cacheOptions.cacheFileName
-        ? cacheOptions.cacheFileName
-        : '.gcspublish-' + bucketName;
+    // Init Cache file
+    this.cacheFile = cacheFile ? cacheFile : `.gcspublish-${bucketName}`;
 
-    // load cache
+    // Load cache
     try {
-      this.fileCache = JSON.parse(
-        fs.readFileSync(this.getCacheFilename(), 'utf8')
-      );
+      this.fileCache = JSON.parse(fs.readFileSync(this.cacheFile, 'utf8'));
     } catch (err) {
       this.fileCache = {};
     }
   }
 
-  getCacheFilename(): string {
-    return this.cacheFile;
-  }
+  private saveCache = () => {
+    fs.writeFileSync(this.cacheFile, JSON.stringify(this.fileCache));
+  };
 
-  saveCache() {
-    fs.writeFileSync(this.getCacheFilename(), JSON.stringify(this.fileCache));
-  }
-
-  cache() {
+  public cache = () => {
     let counter = 0;
 
     const stream = through.obj((file, enc, cb) => {
       if (file.gcs && file.gcs.path) {
-        // do nothing for file already cached
+        // Do nothing for file already cached
         if (file.gcs.state === 'cache') {
           return cb(null, file);
         }
 
-        // remove deleted
+        // Remove deleted
         if (file.gcs.state === 'delete') {
           delete this.fileCache[file.gcs.path];
 
-          // update others
+          // Update others
         } else if (file.gcs.etag) {
           this.fileCache[file.gcs.path] = file.gcs.etag;
         }
 
-        // save cache every 10 files
-        if (++counter % 10) this.saveCache();
+        // Save cache every 10 files
+        if (++counter % 10) {
+          this.saveCache();
+        }
       }
 
       cb(null, file);
@@ -193,17 +204,17 @@ class Publisher {
     stream.on('finish', this.saveCache);
 
     return stream;
-  }
+  };
 
-  publish(headers, options) {
+  public publish = (headers, options) => {
     const _this = this;
 
-    // init opts
+    // Init opts
     if (!options) {
       options = { force: false };
     }
 
-    // init param object
+    // Init param object
     if (!headers) {
       headers = {};
     }
@@ -216,7 +227,7 @@ class Publisher {
         return cb();
       }
 
-      // streams not supported
+      // Streams not supported
       if (file.isStream()) {
         this.emit(
           'error',
@@ -225,35 +236,35 @@ class Publisher {
         return cb();
       }
 
-      // check if file.contents is a `Buffer`
+      // Check if file.contents is a `Buffer`
       if (file.isBuffer()) {
         initFile(file);
 
-        // calculate etag
+        // Calculate etag
         etag = '"' + md5Hash(file.contents) + '"';
 
-        // delete - stop here
+        // Delete - stop here
         if (file.gcs.state === 'delete') {
           return cb(null, file);
         }
 
-        // check if file is identical as the one in cache
+        // Check if file is identical as the one in cache
         if (!options.force && _this.fileCache[file.gcs.path] === etag) {
           file.gcs.state = 'cache';
           return cb(null, file);
         }
 
-        // add content-type header
+        // Add content-type header
         if (!file.gcs.headers['Content-Type']) {
           file.gcs.headers['Content-Type'] = getContentType(file);
         }
 
-        // add content-length header
+        // Add content-length header
         if (!file.gcs.headers['Content-Length']) {
           file.gcs.headers['Content-Length'] = file.contents.length;
         }
 
-        // add extra headers
+        // Add extra headers
         for (header in headers) {
           file.gcs.headers[header] = headers[header];
         }
@@ -262,65 +273,62 @@ class Publisher {
           return cb(null, file);
         }
 
-        // get gcs headers
-        _this.client
-          .file(file.gcs.path)
-          .getMetadata((err, [res]: GetFileMetadataResponse) => {
-            //ignore 403 and 404 errors since we're checking if a file exists on gcs
-            if (err && [403, 404].indexOf(err.statusCode) < 0) {
-              return cb(err);
-            }
+        // Get gcs headers
+        _this.client.file(file.gcs.path).getMetadata((err, metadata, res) => {
+          // Ignore 403 and 404 errors since we're checking if a file exists on gcs
+          if (err && [403, 404].indexOf(err.code) < 0) {
+            return cb(err);
+          } else {
+            metadata = {};
+          }
 
-            res = res || {};
+          // Skip: no updates allowed
+          const noUpdate = options.createOnly && metadata.etag;
 
-            // skip: no updates allowed
-            const noUpdate = options.createOnly && res.etag;
+          // Skip: file are identical
+          const noChange = !options.force && metadata.etag === etag;
 
-            // skip: file are identical
-            const noChange = !options.force && res.etag === etag;
+          if (noUpdate || noChange) {
+            file.gcs.state = 'skip';
+            file.gcs.etag = etag;
+            file.gcs.date = new Date(metadata.updated);
+            cb(err, file);
 
-            if (noUpdate || noChange) {
-              file.gcs.state = 'skip';
+            // Update: file are different
+          } else {
+            file.gcs.state = metadata.etag ? 'update' : 'create';
+
+            _this.client.upload(`${_this.uploadBase}/${file.gcs.path}`, err => {
+              if (err) {
+                return cb(err);
+              }
+
+              file.gcs.date = new Date();
               file.gcs.etag = etag;
-              file.gcs.date = new Date(res.updated);
               cb(err, file);
-
-              // update: file are different
-            } else {
-              file.gcs.state = res.etag ? 'update' : 'create';
-
-              _this.client.upload(file.gcs.path, err => {
-                if (err) {
-                  return cb(err);
-                }
-
-                file.gcs.date = new Date();
-                file.gcs.etag = etag;
-                cb(err, file);
-              });
-            }
-          });
+            });
+          }
+        });
       }
     });
-  }
+  };
 }
 
 /**
  * Shortcut for `new Publisher()`.
  *
+ * @param {Object} options
  * @param {Object} StorageOptions
- * @param {Object} cacheOptions
  * @return {Publisher}
  *
  * @api public
  */
 
 export const create = (
-  bucketName: string,
-  storageOptions: StorageOptions,
-  cacheOptions?: {
-    cacheFileName: string;
-  }
-) => {
-  return new Publisher(bucketName, storageOptions, cacheOptions);
-};
+  options: {
+    bucketName: string;
+    uploadBase: string;
+    cacheFile: string;
+  },
+  storageOptions: StorageOptions
+) => new Publisher(options, storageOptions);
