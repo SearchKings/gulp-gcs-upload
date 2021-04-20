@@ -129,14 +129,16 @@ class Publisher {
   constructor(
     bucketName: string,
     storageOptions: StorageOptions,
-    cacheOptions
+    cacheOptions: {
+      cacheFileName: string;
+    }
   ) {
-    if (bucketName) {
-      throw new Error('Missing `params.Bucket` config value.');
+    if (!bucketName) {
+      throw new Error('Missing `bucketName` config value.');
     }
 
     this.config = storageOptions;
-    this.client = new Storage(this.config).bucket(bucketName);
+    this.client = new Storage(this.config).bucket(`${bucketName}`);
 
     // init Cache file
     this.cacheFile =
@@ -197,10 +199,14 @@ class Publisher {
     const _this = this;
 
     // init opts
-    if (!options) options = { force: false };
+    if (!options) {
+      options = { force: false };
+    }
 
     // init param object
-    if (!headers) headers = {};
+    if (!headers) {
+      headers = {};
+    }
 
     return through.obj(function (file, enc, cb) {
       let header, etag;
@@ -238,15 +244,19 @@ class Publisher {
         }
 
         // add content-type header
-        if (!file.gcs.headers['Content-Type'])
+        if (!file.gcs.headers['Content-Type']) {
           file.gcs.headers['Content-Type'] = getContentType(file);
+        }
 
         // add content-length header
-        if (!file.gcs.headers['Content-Length'])
+        if (!file.gcs.headers['Content-Length']) {
           file.gcs.headers['Content-Length'] = file.contents.length;
+        }
 
         // add extra headers
-        for (header in headers) file.gcs.headers[header] = headers[header];
+        for (header in headers) {
+          file.gcs.headers[header] = headers[header];
+        }
 
         if (options.simulate) {
           return cb(null, file);
@@ -294,6 +304,7 @@ class Publisher {
     });
   }
 }
+
 /**
  * Shortcut for `new Publisher()`.
  *
@@ -307,7 +318,9 @@ class Publisher {
 export const create = (
   bucketName: string,
   storageOptions: StorageOptions,
-  cacheOptions
+  cacheOptions?: {
+    cacheFileName: string;
+  }
 ) => {
   return new Publisher(bucketName, storageOptions, cacheOptions);
 };
