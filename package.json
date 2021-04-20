@@ -1,0 +1,49 @@
+{
+  "name": "gulp-gcs-upload",
+  "version": "0.0.0",
+  "description": "Gulp plugin to upload to Google Cloud Storage",
+  "main": "build/main/index.js",
+  "typings": "build/main/index.d.ts",
+  "module": "build/module/index.js",
+  "repository": "https://github.com/rosslavery/gulp-gcs-upload",
+  "license": "MIT",
+  "keywords": [],
+  "scripts": {
+    "build": "run-s clean && run-p build:*",
+    "build:main": "tsc -p tsconfig.json",
+    "build:watch": "./node_modules/.bin/tsc-watch --onSuccess \"node ./build/main/index.js\"",
+    "build:module": "tsc -p tsconfig.module.json",
+    "fix": "run-s fix:*",
+    "fix:prettier": "prettier \"src/**/*.ts\" --write",
+    "fix:tslint": "tslint --fix --project .",
+    "watch": "run-s clean build:watch",
+    "reset": "git clean -dfx && git reset --hard && npm i",
+    "clean": "trash build test"
+  },
+  "engines": {
+    "node": ">=8.9"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^5.8.3",
+    "lodash.chunk": "^4.2.0",
+    "mime-types": "^2.1.30",
+    "pascal-case": "^3.1.2",
+    "plugin-error": "^1.0.1",
+    "through2": "^4.0.1",
+    "vinyl": "^2.2.1"
+  },
+  "devDependencies": {
+    "@types/lodash.chunk": "^4.2.6",
+    "@types/node": "^14.14.41",
+    "@types/through2": "^2.0.36",
+    "@types/vinyl": "^2.0.4",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^2.2.1",
+    "trash-cli": "^4.0.0",
+    "tsc-watch": "^4.2.9",
+    "typescript": "^4.2.4"
+  },
+  "prettier": {
+    "singleQuote": true
+  }
+}
