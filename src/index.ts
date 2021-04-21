@@ -236,7 +236,7 @@ export class Publisher {
         return cb(null, file);
       }
 
-      state = '[' + file.gcs.state + ']';
+      state = `[${file.gcs.state}]`;
       state = pad.right(state, 8);
 
       switch (file.gcs.state) {
