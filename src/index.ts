@@ -4,6 +4,10 @@ import through from 'through2';
 import crypto from 'crypto';
 import mime from 'mime-types';
 import PluginError from 'plugin-error';
+import pad from 'pad-component';
+import colors from 'ansi-colors';
+import fancyLog from 'fancy-log';
+
 import { PluginFile, PluginOptions } from './type';
 
 /**
@@ -36,9 +40,9 @@ const getContentType = (file: PluginFile): string => {
 
 /**
  * Init file gcs hash
- * @param  {Vinyl} file file object
+ * @param file file object
  *
- * @return {Vinyl} file
+ * @return file
  * @api private
  */
 
@@ -213,5 +217,45 @@ export class Publisher {
         });
       }
     });
+  };
+
+  public report = (options?: any) => {
+    if (!options) {
+      options = {};
+    }
+
+    const stream = through.obj(function (file, enc, cb) {
+      let state;
+      if (!file.gcs) {
+        return cb(null, file);
+      }
+      if (!file.gcs.state) {
+        return cb(null, file);
+      }
+      if (options.states && options.states.indexOf(file.gcs.state) === -1) {
+        return cb(null, file);
+      }
+
+      state = '[' + file.gcs.state + ']';
+      state = pad.right(state, 8);
+
+      switch (file.gcs.state) {
+        case 'create':
+          state = colors.green(state);
+          break;
+        case 'delete':
+          state = colors.red(state);
+          break;
+        default:
+          state = colors.cyan(state);
+          break;
+      }
+
+      fancyLog(state, file.gcs.path);
+      cb(null, file);
+    });
+
+    stream.resume();
+    return stream;
   };
 }
