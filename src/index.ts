@@ -1,4 +1,9 @@
-import { Bucket, Storage, StorageOptions } from '@google-cloud/storage';
+import {
+  Bucket,
+  Storage,
+  StorageOptions,
+  UploadOptions
+} from '@google-cloud/storage';
 import fs from 'fs';
 import through from 'through2';
 import crypto from 'crypto';
@@ -6,8 +11,9 @@ import mime from 'mime-types';
 import PluginError from 'plugin-error';
 import colors from 'ansi-colors';
 import fancyLog from 'fancy-log';
+import internal from 'stream';
 
-import { PluginFile, PluginOptions } from './type';
+import { PluginFile, PluginOptions, ReportOptions } from './type';
 
 /**
  * Calculate file hash
@@ -17,13 +23,13 @@ import { PluginFile, PluginOptions } from './type';
  * @api private
  */
 
-const md5Hash = (buf): string => {
+const md5Hash = (buf: Buffer): string => {
   return crypto.createHash('md5').update(buf).digest('hex');
 };
 
 /**
  * Determine the content type of a file based on charset and mime type.
- * @param  {Object} file
+ * @param  {PluginFile} file
  * @return {String}
  *
  * @api private
@@ -39,12 +45,10 @@ const getContentType = (file: PluginFile): string => {
 
 /**
  * Init file gcs hash
- * @param file file object
  *
+ * @param {PluginFile} file
  * @return file
- * @api private
  */
-
 const initFile = (file: PluginFile): PluginFile => {
   if (!file.gcs) {
     file.gcs = {};
@@ -54,7 +58,9 @@ const initFile = (file: PluginFile): PluginFile => {
   return file;
 };
 
-// Publisher class
+/**
+ * Publisher class
+ */
 export class Publisher {
   private client: Bucket;
   private uploadBase: string;
@@ -83,11 +89,11 @@ export class Publisher {
     }
   }
 
-  private saveCache = () => {
+  private saveCache = (): void => {
     fs.writeFileSync(this.cacheFile, JSON.stringify(this.fileCache));
   };
 
-  public cache = () => {
+  public cache = (): internal.Transform => {
     let counter: number = 0;
 
     const stream = through.obj((file, enc, cb) => {
@@ -120,7 +126,19 @@ export class Publisher {
     return stream;
   };
 
-  public publish = () => {
+  /**
+   *
+   * Default Options: {
+   *  gzip: true,
+      metadata: {
+        cacheControl: 'max-age=315360000, no-transform, public'
+      }
+     }
+   * 
+   * @param {UploadOptions} options
+   * @returns internal.Transform
+   */
+  public publish = (options?: UploadOptions): internal.Transform => {
     const _this: this = this;
 
     return through.obj(function (file, enc, cb) {
@@ -193,15 +211,18 @@ export class Publisher {
           } else {
             file.gcs.state = metadata.etag ? 'update' : 'create';
 
-            _this.client.upload(
-              `${_this.uploadBase}/${file.gcs.path}`,
-              {
-                destination: file.gcs.path,
+            if (!options) {
+              options = {
                 gzip: true,
                 metadata: {
                   cacheControl: 'max-age=315360000, no-transform, public'
                 }
-              },
+              };
+            }
+
+            _this.client.upload(
+              `${_this.uploadBase}/${file.gcs.path}`,
+              { destination: file.gcs.path, ...options },
               err => {
                 if (err) {
                   return cb(err);
@@ -218,19 +239,27 @@ export class Publisher {
     });
   };
 
-  public report = (options?: any) => {
+  /**
+   *
+   * @param {ReportOptions} options
+   * @returns internal.Transform
+   */
+  public report = (options?: ReportOptions): internal.Transform => {
     if (!options) {
       options = {};
     }
 
     const stream = through.obj(function (file, enc, cb) {
-      let state;
+      let state: string;
+
       if (!file.gcs) {
         return cb(null, file);
       }
+
       if (!file.gcs.state) {
         return cb(null, file);
       }
+
       if (options.states && options.states.indexOf(file.gcs.state) === -1) {
         return cb(null, file);
       }

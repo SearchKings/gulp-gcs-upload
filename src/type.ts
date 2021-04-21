@@ -6,6 +6,10 @@ export interface PluginOptions {
   cacheFile: string;
 }
 
+export interface ReportOptions {
+  states?: string;
+}
+
 export interface PluginFile {
   path: string;
   unzipPath: string;
