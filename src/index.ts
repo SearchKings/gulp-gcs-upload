@@ -9,8 +9,8 @@ import through from 'through2';
 import zlib from 'zlib';
 import crypto from 'crypto';
 import mime from 'mime-types';
-import { pascalCase } from 'pascal-case';
 import PluginError from 'plugin-error';
+import { PluginOptions } from './type';
 
 const PLUGIN_NAME = 'gulp-gcs-upload';
 
@@ -141,7 +141,6 @@ export const gzip = options => {
 
 class Publisher {
   private client: Bucket;
-  private config: StorageOptions;
   private uploadBase: string;
   private cacheFile: string;
   private fileCache: { [key: string]: string };
@@ -154,9 +153,8 @@ class Publisher {
       throw new Error('Missing bucket name');
     }
 
-    this.config = storageOptions;
     this.uploadBase = uploadBase;
-    this.client = new Storage(this.config).bucket(bucketName);
+    this.client = new Storage(storageOptions).bucket(bucketName);
 
     // Init Cache file
     this.cacheFile = cacheFile ? cacheFile : `.gcspublish-${bucketName}`;
@@ -298,15 +296,19 @@ class Publisher {
           } else {
             file.gcs.state = metadata.etag ? 'update' : 'create';
 
-            _this.client.upload(`${_this.uploadBase}/${file.gcs.path}`, err => {
-              if (err) {
-                return cb(err);
-              }
+            _this.client.upload(
+              `${_this.uploadBase}/${file.gcs.path}`,
+              { destination: file.gcs.path },
+              err => {
+                if (err) {
+                  return cb(err);
+                }
 
-              file.gcs.date = new Date();
-              file.gcs.etag = etag;
-              cb(err, file);
-            });
+                file.gcs.date = new Date();
+                file.gcs.etag = etag;
+                cb(err, file);
+              }
+            );
           }
         });
       }
@@ -325,10 +327,6 @@ class Publisher {
  */
 
 export const create = (
-  options: {
-    bucketName: string;
-    uploadBase: string;
-    cacheFile: string;
-  },
+  options: PluginOptions,
   storageOptions: StorageOptions
 ) => new Publisher(options, storageOptions);

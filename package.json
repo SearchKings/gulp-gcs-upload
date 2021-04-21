@@ -3,13 +3,13 @@
   "version": "0.0.0",
   "description": "Gulp plugin to upload to Google Cloud Storage",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "repository": "https://github.com/SearchKings/gulp-gcs-upload",
   "license": "MIT",
   "keywords": [],
   "scripts": {
     "lint": "npx eslint \"src/**/*.ts\"",
     "build": "npx tsc",
-    "preversion": "npm run build",
     "start": "npx tsc -w",
     "prettier:all": "npx prettier --write \"**/*ts\"",
     "prettier:check:all": "npx prettier --check --config ./.prettierrc \"**/*ts\"",
@@ -29,7 +29,6 @@
     "mime-types": "^2.1.30",
     "plugin-error": "^1.0.1",
     "through2": "^4.0.2",
-    "pascal-case": "^3.1.2",
     "vinyl": "^2.2.1"
   },
   "devDependencies": {
