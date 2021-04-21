@@ -4,6 +4,7 @@ tsconfig.json
 .eslintrc.json
 .github
 .prettierignore
+.prettierrc
 .vscode
 **/*.spec.*
 *.log
