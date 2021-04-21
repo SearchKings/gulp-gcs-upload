@@ -13,6 +13,7 @@ import colors from 'ansi-colors';
 import fancyLog from 'fancy-log';
 import internal from 'stream';
 import Vinyl from 'vinyl';
+import { omit } from 'lodash';
 
 import { PluginOptions, ReportOptions } from './type';
 
@@ -204,29 +205,16 @@ export class Publisher {
           } else {
             file.gcs.state = !!metadata.etag ? 'update' : 'create';
 
-            if (!uploadOptions) {
-              uploadOptions = {
-                contentType: file.gcs.headers.contentType,
-                gzip: true
-              };
-            }
-
-            if (uploadOptions.metadata) {
-              uploadOptions = {
-                ...uploadOptions,
-                metadata: { ...uploadOptions.metadata }
-              };
-            }
-
-            // console.log(
-            //   file.basename,
-            //   file.gcs.headers.contentType,
-            //   uploadOptions
-            // );
-
             _this.client.upload(
               `${file.base}/${file.gcs.path}`,
-              { destination: file.gcs.path, ...uploadOptions },
+              {
+                // To avoid incorrect order of Vinyl metadata, set property inside of this block
+                destination: file.gcs.path,
+                contentType: file.gcs.headers.contentType,
+                gzip: true,
+                // Omit below properties and let plugin handle it
+                ...omit(uploadOptions, ['destination', 'contentType'])
+              },
               err => {
                 if (err) {
                   return cb(err);
