@@ -118,7 +118,7 @@ export class Publisher {
       cb(null, file);
     });
 
-    stream.on('finish', this.saveCache);
+    stream.on('finish', () => this.saveCache());
 
     return stream;
   }
