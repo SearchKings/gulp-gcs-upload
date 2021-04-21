@@ -4,7 +4,6 @@ import through from 'through2';
 import crypto from 'crypto';
 import mime from 'mime-types';
 import PluginError from 'plugin-error';
-import pad from 'pad-component';
 import colors from 'ansi-colors';
 import fancyLog from 'fancy-log';
 
@@ -237,7 +236,6 @@ export class Publisher {
       }
 
       state = `[${file.gcs.state}]`;
-      state = pad.right(state, 8);
 
       switch (file.gcs.state) {
         case 'create':

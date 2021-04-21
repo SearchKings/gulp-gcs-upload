@@ -27,28 +27,21 @@
     "@google-cloud/storage": "^5.8.4",
     "ansi-colors": "^4.1.1",
     "fancy-log": "^1.3.3",
-    "lodash.chunk": "^4.2.0",
     "mime-types": "^2.1.30",
-    "pad-component": "0.0.1",
     "plugin-error": "^1.0.1",
     "through2": "^4.0.2"
   },
   "devDependencies": {
-    "@types/lodash.chunk": "^4.2.6",
     "@types/mime-types": "^2.1.0",
     "@types/node": "^14.14.41",
     "@types/through2": "^2.0.36",
-    "@types/vinyl": "^2.0.4",
     "@typescript-eslint/eslint-plugin": "^4.22.0",
     "@typescript-eslint/parser": "^4.22.0",
     "eslint-config-prettier": "^8.2.0",
     "eslint-plugin-prettier": "^3.4.0",
     "husky": "^6.0.0",
-    "npm-run-all": "^4.1.5",
     "prettier": "^2.2.1",
     "pretty-quick": "^3.1.0",
-    "trash-cli": "^4.0.0",
-    "tsc-watch": "^4.2.9",
     "typescript": "^4.2.4"
   },
   "private": true
