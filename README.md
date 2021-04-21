@@ -19,7 +19,7 @@ import { Publisher } from '@searchkings/gulp-gcs-upload';
   const publisher: Publisher = new Publisher(
     {
       bucketName,
-      uploadBase: '/'
+      uploadBase: 'dist'
     },
     {
       keyFilename: 'GCS-credentials'
@@ -27,9 +27,7 @@ import { Publisher } from '@searchkings/gulp-gcs-upload';
   );
 
   return gulp
-    .src(`/**`, {
-      base: `/`
-    })
+    .src(`dist/**`)
     .pipe(publisher.publish())
     .pipe(publisher.cache())
     .pipe(publisher.report());
