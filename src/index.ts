@@ -182,7 +182,7 @@ export class Publisher {
           if (err && [403, 404].indexOf(err.code) < 0) {
             return cb(err);
           } else {
-            metadata = {};
+            metadata = metadata || {};
           }
 
           // Skip: no updates allowed
