@@ -13,30 +13,31 @@ import colors from 'ansi-colors';
 import fancyLog from 'fancy-log';
 import internal from 'stream';
 import Vinyl from 'vinyl';
-import { omit } from 'lodash';
+import omit from 'lodash.omit';
 
 import { PluginOptions, ReportOptions } from './types';
 
 /**
- * Publisher class
+ * Uploads a stream of files to a Google Cloud Storage bucket
  */
 export class Publisher {
-  private client: Bucket;
   private cacheFile: string;
-  private fileCache: { [key: string]: string };
+  private client: Bucket;
+  private fileCache: { [filePath: string]: string };
+  private pluginOptions: PluginOptions;
 
-  constructor(
-    { bucketName, cacheFile }: PluginOptions,
-    storageOptions: StorageOptions
-  ) {
-    if (!bucketName) {
+  constructor(pluginOptions: PluginOptions, storageOptions: StorageOptions) {
+    if (!pluginOptions?.bucketName) {
       throw new Error('Missing bucket name');
     }
 
-    this.client = new Storage(storageOptions).bucket(bucketName);
+    this.pluginOptions = pluginOptions;
+    this.client = new Storage(storageOptions).bucket(pluginOptions.bucketName);
 
     // Init Cache file
-    this.cacheFile = cacheFile ? cacheFile : `.gcspublish-${bucketName}`;
+    this.cacheFile = pluginOptions.cacheFile
+      ? pluginOptions.cacheFile
+      : `.gcspublish-${pluginOptions.bucketName}`;
 
     // Load cache
     try {
@@ -56,10 +57,9 @@ export class Publisher {
   }
 
   /**
-   * Init file gcs hash
-   *
-   * @param {Vinyl} file
-   * @return file
+   * Adds some internal-only properties to a vinyl file
+   * @param file File to initialize properties on
+   * @returns Modified vinyl with with private properties
    */
   private initFile(file: Vinyl): Vinyl {
     if (!file.gcs) {
@@ -100,7 +100,7 @@ export class Publisher {
 
     const stream = through.obj((file, enc, cb) => {
       if (file.gcs && file.gcs.path) {
-        // Do nothing for file already cached
+        // Do nothing for files already cached
         if (file.gcs.state === 'cache') {
           return cb(null, file);
         }
@@ -125,7 +125,7 @@ export class Publisher {
 
   /**
    * Publish the streamed files to the configured Google Cloud Storage bucket
-   * @param uploadOptions TODO: this?
+   * @param uploadOptions Google Cloud Storage upload options for each file
    * @returns Stream that completes when uploading is done
    */
   public publish(uploadOptions?: UploadOptions): internal.Transform {
@@ -155,12 +155,7 @@ export class Publisher {
         // Calculate etag
         etag = `"${_this.md5Hash(file.contents)}"`;
 
-        // Delete - stop here
-        if (file.gcs.state === 'delete') {
-          return cb(null, file);
-        }
-
-        // Check if file is identical as the one in cache
+        // Check if file is identical to the one in cache
         if (_this.fileCache[file.gcs.path] === etag) {
           file.gcs.state = 'cache';
           return cb(null, file);
@@ -185,8 +180,8 @@ export class Publisher {
             metadata = metadata || {};
           }
 
-          // Skip: no updates allowed
-          const noUpdate = !!metadata.etag;
+          // Skip: file exists, no updates allowed
+          const noUpdate = !!(_this.pluginOptions.createOnly && metadata.etag);
 
           // Skip: file are identical
           const noChange = !!(metadata.etag === etag);
@@ -196,7 +191,7 @@ export class Publisher {
             file.gcs.etag = etag;
             cb(err, file);
 
-            // Update: file are different
+            // Update: files are different or file doesn't exist yet
           } else {
             file.gcs.state = !!metadata.etag ? 'update' : 'create';
 
@@ -226,9 +221,9 @@ export class Publisher {
   }
 
   /**
-   *
-   * @param {ReportOptions} reportOptions
-   * @returns internal.Transform
+   * Logs the state of the file stream, indicating which files were created or updated
+   * @param reportOptions Options containing a list of states to report on
+   * @returns Stream containing the report results
    */
   public report(reportOptions?: ReportOptions): internal.Transform {
     if (!reportOptions) {
@@ -259,9 +254,6 @@ export class Publisher {
         case 'create':
           state = colors.green(state);
           break;
-        case 'delete':
-          state = colors.red(state);
-          break;
         default:
           state = colors.cyan(state);
           break;
@@ -272,6 +264,7 @@ export class Publisher {
     });
 
     stream.resume();
+
     return stream;
   }
 }
