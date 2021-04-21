@@ -14,12 +14,13 @@ npm install --save @searchkings/gulp-gcs-upload
 
 ```ts
 import { Publisher } from '@searchkings/gulp-gcs-upload';
+import concurrentTransform from 'concurrent-transform';
 
   const bucketName: string = 'cdn';
   const publisher: Publisher = new Publisher(
     {
       bucketName,
-      uploadBase: 'dist'
+      cacheFile: (default: '.gcspublish-"bucketName"')
     },
     {
       keyFilename: 'GCS-credentials'
@@ -29,7 +30,7 @@ import { Publisher } from '@searchkings/gulp-gcs-upload';
   return gulp
     .src(`dist/**`)
     .pipe(publisher.publish())
-    .pipe(publisher.cache())
+    .pipe(concurrentTransform(publisher.publish(), 20))
     .pipe(publisher.report());
 };
 
