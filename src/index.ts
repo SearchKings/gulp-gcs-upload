@@ -18,54 +18,10 @@ import { omit } from 'lodash';
 import { PluginOptions, ReportOptions } from './type';
 
 /**
- * Calculate file hash
- * @param  {Buffer} buf
- * @return {String}
- *
- * @api private
- */
-
-const md5Hash = (buf: Buffer): string => {
-  return crypto.createHash('md5').update(buf).digest('hex');
-};
-
-/**
- * Determine the content type of a file based on charset and mime type.
- * @param  {Vinyl} file
- * @return {String}
- *
- * @api private
- */
-const getContentType = (file: Vinyl): string => {
-  const mimeType: string =
-    mime.lookup(file.unzipPath || file.path) || 'application/octet-stream';
-
-  const charset: string | false = mime.charset(mimeType);
-
-  return charset ? mimeType + '; charset=' + charset.toLowerCase() : mimeType;
-};
-
-/**
- * Init file gcs hash
- *
- * @param {Vinyl} file
- * @return file
- */
-const initFile = (file: Vinyl): Vinyl => {
-  if (!file.gcs) {
-    file.gcs = {};
-    file.gcs.headers = {};
-    file.gcs.path = file.relative.replace(/\\/g, '/');
-  }
-  return file;
-};
-
-/**
  * Publisher class
  */
 export class Publisher {
   private client: Bucket;
-  // private uploadBase: string;
   private cacheFile: string;
   private fileCache: { [key: string]: string };
 
@@ -77,7 +33,6 @@ export class Publisher {
       throw new Error('Missing bucket name');
     }
 
-    // this.uploadBase = uploadBase;
     this.client = new Storage(storageOptions).bucket(bucketName);
 
     // Init Cache file
@@ -91,11 +46,56 @@ export class Publisher {
     }
   }
 
-  private saveCache = (): void => {
-    fs.writeFileSync(this.cacheFile, JSON.stringify(this.fileCache));
-  };
+  /**
+   * Calculates an md5 hash for a given file buffer
+   * @param buf Buffer of file to create hash for
+   * @returns Calculated md5 hash
+   */
+  private md5Hash(buf: Buffer): string {
+    return crypto.createHash('md5').update(buf).digest('hex');
+  }
 
-  public cache = (): internal.Transform => {
+  /**
+   * Init file gcs hash
+   *
+   * @param {Vinyl} file
+   * @return file
+   */
+  private initFile(file: Vinyl): Vinyl {
+    if (!file.gcs) {
+      file.gcs = {};
+      file.gcs.path = file.relative.replace(/\\/g, '/');
+    }
+
+    return file;
+  }
+
+  /**
+   * Write the current cache to the destination cache file
+   */
+  private saveCache(): void {
+    fs.writeFileSync(this.cacheFile, JSON.stringify(this.fileCache));
+  }
+
+  /**
+   * Determine the content type of a file based on charset and mime type.
+   * @param file Vinyl file to get the content type for
+   * @returns Content type of the passed-in file
+   */
+  private getContentType(file: Vinyl): string {
+    const mimeType: string =
+      mime.lookup(file.unzipPath || file.path) || 'application/octet-stream';
+
+    const charset: string | false = mime.charset(mimeType);
+
+    return charset ? mimeType + '; charset=' + charset.toLowerCase() : mimeType;
+  }
+
+  /**
+   * Used to pipe upload results into a cache file to avoid re-uploading later
+   * @returns Stream that completes when caching is done
+   */
+  public cache(): internal.Transform {
     let counter: number = 0;
 
     const stream = through.obj((file, enc, cb) => {
@@ -105,12 +105,7 @@ export class Publisher {
           return cb(null, file);
         }
 
-        // Remove deleted
-        if (file.gcs.state === 'delete') {
-          delete this.fileCache[file.gcs.path];
-
-          // Update others
-        } else if (file.gcs.etag) {
+        if (file.gcs.etag) {
           this.fileCache[file.gcs.path] = file.gcs.etag;
         }
 
@@ -126,17 +121,17 @@ export class Publisher {
     stream.on('finish', this.saveCache);
 
     return stream;
-  };
+  }
 
   /**
-   *
-   * @param {UploadOptions} uploadOptions
-   * @returns internal.Transform
+   * Publish the streamed files to the configured Google Cloud Storage bucket
+   * @param uploadOptions TODO: this?
+   * @returns Stream that completes when uploading is done
    */
-  public publish = (uploadOptions?: UploadOptions): internal.Transform => {
+  public publish(uploadOptions?: UploadOptions): internal.Transform {
     const _this: this = this;
 
-    return through.obj(function (file, enc, cb) {
+    return through.obj(function (file: Vinyl, enc, cb) {
       let etag: string;
 
       // Do nothing if no contents
@@ -155,10 +150,10 @@ export class Publisher {
 
       // Check if file.contents is a `Buffer`
       if (file.isBuffer()) {
-        initFile(file);
+        _this.initFile(file);
 
         // Calculate etag
-        etag = `"${md5Hash(file.contents)}"`;
+        etag = `"${_this.md5Hash(file.contents)}"`;
 
         // Delete - stop here
         if (file.gcs.state === 'delete') {
@@ -173,7 +168,7 @@ export class Publisher {
 
         // Add content-type header
         if (!file.gcs.headers.contentType) {
-          file.gcs.headers.contentType = getContentType(file);
+          file.gcs.headers.contentType = _this.getContentType(file);
         }
 
         // Add content-length header
@@ -228,14 +223,14 @@ export class Publisher {
         });
       }
     });
-  };
+  }
 
   /**
    *
    * @param {ReportOptions} reportOptions
    * @returns internal.Transform
    */
-  public report = (reportOptions?: ReportOptions): internal.Transform => {
+  public report(reportOptions?: ReportOptions): internal.Transform {
     if (!reportOptions) {
       reportOptions = {};
     }
@@ -278,5 +273,5 @@ export class Publisher {
 
     stream.resume();
     return stream;
-  };
+  }
 }
