@@ -15,7 +15,7 @@ import internal from 'stream';
 import Vinyl from 'vinyl';
 import { omit } from 'lodash';
 
-import { PluginOptions, ReportOptions } from './type';
+import { PluginOptions, ReportOptions } from './types';
 
 /**
  * Publisher class
