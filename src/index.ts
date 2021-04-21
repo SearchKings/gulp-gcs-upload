@@ -132,8 +132,6 @@ export class Publisher {
     const _this: this = this;
 
     return through.obj(function (file: Vinyl, enc, cb) {
-      let etag: string;
-
       // Do nothing if no contents
       if (file.isNull()) {
         return cb();
@@ -152,23 +150,16 @@ export class Publisher {
       if (file.isBuffer()) {
         _this.initFile(file);
 
+        // Determine contentType
+        const contentType = _this.getContentType(file);
+
         // Calculate etag
-        etag = `"${_this.md5Hash(file.contents)}"`;
+        const etag = `"${_this.md5Hash(file.contents)}"`;
 
         // Check if file is identical to the one in cache
         if (_this.fileCache[file.gcs.path] === etag) {
           file.gcs.state = 'cache';
           return cb(null, file);
-        }
-
-        // Add content-type header
-        if (!file.gcs.headers.contentType) {
-          file.gcs.headers.contentType = _this.getContentType(file);
-        }
-
-        // Add content-length header
-        if (!file.gcs.headers.contentLength) {
-          file.gcs.headers.contentLength = file.contents.length;
         }
 
         // Get file metadata from GCS
@@ -200,7 +191,7 @@ export class Publisher {
               {
                 // To avoid incorrect order of Vinyl metadata, set property inside of this block
                 destination: file.gcs.path,
-                contentType: file.gcs.headers.contentType,
+                contentType,
                 gzip: true,
                 // Omit below properties and let plugin handle it
                 ...omit(uploadOptions, ['destination', 'contentType'])
