@@ -12,8 +12,9 @@ import PluginError from 'plugin-error';
 import colors from 'ansi-colors';
 import fancyLog from 'fancy-log';
 import internal from 'stream';
+import Vinyl from 'vinyl';
 
-import { PluginFile, PluginOptions, ReportOptions } from './type';
+import { PluginOptions, ReportOptions } from './type';
 
 /**
  * Calculate file hash
@@ -29,12 +30,12 @@ const md5Hash = (buf: Buffer): string => {
 
 /**
  * Determine the content type of a file based on charset and mime type.
- * @param  {PluginFile} file
+ * @param  {Vinyl} file
  * @return {String}
  *
  * @api private
  */
-const getContentType = (file: PluginFile): string => {
+const getContentType = (file: Vinyl): string => {
   const mimeType: string =
     mime.lookup(file.unzipPath || file.path) || 'application/octet-stream';
 
@@ -46,10 +47,10 @@ const getContentType = (file: PluginFile): string => {
 /**
  * Init file gcs hash
  *
- * @param {PluginFile} file
+ * @param {Vinyl} file
  * @return file
  */
-const initFile = (file: PluginFile): PluginFile => {
+const initFile = (file: Vinyl): Vinyl => {
   if (!file.gcs) {
     file.gcs = {};
     file.gcs.headers = {};
@@ -63,19 +64,19 @@ const initFile = (file: PluginFile): PluginFile => {
  */
 export class Publisher {
   private client: Bucket;
-  private uploadBase: string;
+  // private uploadBase: string;
   private cacheFile: string;
   private fileCache: { [key: string]: string };
 
   constructor(
-    { bucketName, uploadBase, cacheFile }: PluginOptions,
+    { bucketName, cacheFile }: PluginOptions,
     storageOptions: StorageOptions
   ) {
     if (!bucketName) {
       throw new Error('Missing bucket name');
     }
 
-    this.uploadBase = uploadBase;
+    // this.uploadBase = uploadBase;
     this.client = new Storage(storageOptions).bucket(bucketName);
 
     // Init Cache file
@@ -128,17 +129,10 @@ export class Publisher {
 
   /**
    *
-   * Default Options: {
-   *  gzip: true,
-      metadata: {
-        cacheControl: 'max-age=315360000, no-transform, public'
-      }
-     }
-   * 
-   * @param {UploadOptions} options
+   * @param {UploadOptions} uploadOptions
    * @returns internal.Transform
    */
-  public publish = (options?: UploadOptions): internal.Transform => {
+  public publish = (uploadOptions?: UploadOptions): internal.Transform => {
     const _this: this = this;
 
     return through.obj(function (file, enc, cb) {
@@ -163,7 +157,7 @@ export class Publisher {
         initFile(file);
 
         // Calculate etag
-        etag = '"' + md5Hash(file.contents) + '"';
+        etag = `"${md5Hash(file.contents)}"`;
 
         // Delete - stop here
         if (file.gcs.state === 'delete') {
@@ -177,13 +171,13 @@ export class Publisher {
         }
 
         // Add content-type header
-        if (!file.gcs.headers['Content-Type']) {
-          file.gcs.headers['Content-Type'] = getContentType(file);
+        if (!file.gcs.headers.contentType) {
+          file.gcs.headers.contentType = getContentType(file);
         }
 
         // Add content-length header
-        if (!file.gcs.headers['Content-Length']) {
-          file.gcs.headers['Content-Length'] = file.contents.length;
+        if (!file.gcs.headers.contentLength) {
+          file.gcs.headers.contentLength = file.contents.length;
         }
 
         // Get file metadata from GCS
@@ -204,31 +198,40 @@ export class Publisher {
           if (noUpdate || noChange) {
             file.gcs.state = 'skip';
             file.gcs.etag = etag;
-            file.gcs.date = new Date(metadata.updated);
             cb(err, file);
 
             // Update: file are different
           } else {
-            file.gcs.state = metadata.etag ? 'update' : 'create';
+            file.gcs.state = !!metadata.etag ? 'update' : 'create';
 
-            if (!options) {
-              options = {
-                gzip: true,
-                metadata: {
-                  cacheControl: 'max-age=315360000, no-transform, public'
-                }
+            if (!uploadOptions) {
+              uploadOptions = {
+                contentType: file.gcs.headers.contentType,
+                gzip: true
               };
             }
 
+            if (uploadOptions.metadata) {
+              uploadOptions = {
+                ...uploadOptions,
+                metadata: { ...uploadOptions.metadata }
+              };
+            }
+
+            // console.log(
+            //   file.basename,
+            //   file.gcs.headers.contentType,
+            //   uploadOptions
+            // );
+
             _this.client.upload(
-              `${_this.uploadBase}/${file.gcs.path}`,
-              { destination: file.gcs.path, ...options },
+              `${file.base}/${file.gcs.path}`,
+              { destination: file.gcs.path, ...uploadOptions },
               err => {
                 if (err) {
                   return cb(err);
                 }
 
-                file.gcs.date = new Date();
                 file.gcs.etag = etag;
                 cb(err, file);
               }
@@ -241,12 +244,12 @@ export class Publisher {
 
   /**
    *
-   * @param {ReportOptions} options
+   * @param {ReportOptions} reportOptions
    * @returns internal.Transform
    */
-  public report = (options?: ReportOptions): internal.Transform => {
-    if (!options) {
-      options = {};
+  public report = (reportOptions?: ReportOptions): internal.Transform => {
+    if (!reportOptions) {
+      reportOptions = {};
     }
 
     const stream = through.obj(function (file, enc, cb) {
@@ -260,7 +263,10 @@ export class Publisher {
         return cb(null, file);
       }
 
-      if (options.states && options.states.indexOf(file.gcs.state) === -1) {
+      if (
+        reportOptions.states &&
+        reportOptions.states.indexOf(file.gcs.state) === -1
+      ) {
         return cb(null, file);
       }
 
