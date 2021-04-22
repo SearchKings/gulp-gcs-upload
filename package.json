@@ -31,7 +31,7 @@
     "lodash.omit": "^4.5.0",
     "mime-types": "^2.1.30",
     "plugin-error": "^1.0.1",
-    "through2": "^4.0.2",
+    "through2-concurrent": "^2.0.0",
     "vinyl": "^2.2.1"
   },
   "devDependencies": {
@@ -39,7 +39,7 @@
     "@types/lodash.omit": "^4.5.6",
     "@types/mime-types": "^2.1.0",
     "@types/node": "^14.14.41",
-    "@types/through2": "^2.0.36",
+    "@types/through2-concurrent": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^4.22.0",
     "@typescript-eslint/parser": "^4.22.0",
     "eslint": "^7.24.0",

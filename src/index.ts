@@ -5,8 +5,7 @@ import {
   UploadOptions
 } from '@google-cloud/storage';
 import fs from 'fs';
-import through from 'through2';
-import crypto from 'crypto';
+import throughConcurrent from 'through2-concurrent';
 import mime from 'mime-types';
 import PluginError from 'plugin-error';
 import colors from 'ansi-colors';
@@ -45,15 +44,6 @@ export class Publisher {
     } catch (err) {
       this.fileCache = {};
     }
-  }
-
-  /**
-   * Calculates an md5 hash for a given file buffer
-   * @param buf Buffer of file to create hash for
-   * @returns Calculated md5 hash
-   */
-  private md5Hash(buf: Buffer): string {
-    return crypto.createHash('md5').update(buf).digest('hex');
   }
 
   /**
@@ -101,90 +91,106 @@ export class Publisher {
   }
 
   /**
+   * Adds a file to the in-memory cache, to be persisted to disk later
+   * @param path Path of file to cache
+   * @param hash Hash of file to cache
+   */
+  private removeFromCache(path: string): void {
+    delete this.fileCache[path];
+  }
+
+  /**
    * Publish the streamed files to the configured Google Cloud Storage bucket
    * @param uploadOptions Google Cloud Storage upload options for each file
    * @returns Stream that completes when uploading is done
    */
   public publish(uploadOptions?: UploadOptions): internal.Transform {
-    const _this: this = this;
+    const stream = throughConcurrent.obj(
+      { maxConcurrency: this.pluginOptions.uploadConcurrency || 1 },
+      (file: Vinyl, enc, cb) => {
+        // Do nothing if no contents
+        if (file.isNull()) {
+          return cb();
+        }
 
-    const stream = through.obj(function (file: Vinyl, enc, cb) {
-      // Do nothing if no contents
-      if (file.isNull()) {
-        return cb();
-      }
-
-      // Streams not supported
-      if (file.isStream()) {
-        this.emit(
-          'error',
-          new PluginError('gulp-gcs-upload', 'Stream content is not supported')
-        );
-        return cb();
-      }
-
-      // Check if file.contents is a `Buffer`
-      if (file.isBuffer()) {
-        _this.initFile(file);
-
-        // Determine contentType
-        const contentType = _this.getContentType(file);
-
-        // Get file metadata from GCS
-        _this.client.file(file.gcs.path).getMetadata((err, metadata) => {
-          // Ignore 403 and 404 errors since we're checking if a file exists on gcs
-          if (err && [403, 404].indexOf(err.code) < 0) {
-            return cb(err);
-          } else {
-            metadata = metadata || {};
-          }
-
-          // Check if file is identical to the one in cache
-          if (
-            _this.fileCache[file.gcs.path] &&
-            _this.fileCache[file.gcs.path] === metadata.md5Hash
-          ) {
-            file.gcs.state = 'cache';
-            return cb(null, file);
-          }
-
-          // Skip: file exists, no updates allowed
-          const noUpdate = !!(
-            _this.pluginOptions.createOnly && metadata.md5Hash
+        // Streams not supported
+        if (file.isStream()) {
+          stream.emit(
+            'error',
+            new PluginError(
+              'gulp-gcs-upload',
+              'Stream content is not supported'
+            )
           );
+          return cb();
+        }
 
-          if (noUpdate) {
-            file.gcs.state = 'skip';
-            _this.addToCache(file.gcs.path, metadata.md5Hash);
-            cb(err, file);
+        // Check if file.contents is a `Buffer`
+        if (file.isBuffer()) {
+          this.initFile(file);
 
-            // Update: files are different or file doesn't exist yet
-          } else {
-            file.gcs.state = !!metadata.md5Hash ? 'update' : 'create';
+          // Determine contentType
+          const contentType = this.getContentType(file);
 
-            _this.client.upload(
-              `${file.base}/${file.gcs.path}`,
-              {
-                // To avoid incorrect order of Vinyl metadata, set property inside of this block
-                destination: file.gcs.path,
-                contentType,
-                gzip: true,
-                // Omit below properties and let plugin handle it
-                ...omit(uploadOptions, ['destination', 'contentType'])
-              },
-              (err, uploadedFile) => {
-                if (err) {
-                  return cb(err);
-                }
-
-                _this.addToCache(file.gcs.path, uploadedFile.metadata.md5Hash);
-                cb(err, file);
+          // Get file metadata from GCS
+          this.client.file(file.gcs.path).getMetadata((err, remoteMetadata) => {
+            // Ignore 403 and 404 errors since we're checking if a file exists on gcs
+            if (err && [403, 404].indexOf(err.code) < 0) {
+              return cb(err);
+            } else {
+              // If the file isn't in the bucket, clear it from the cache, initialize empty metadata
+              if (!remoteMetadata) {
+                this.removeFromCache(file.gcs.path);
               }
+            }
+
+            // Check if file is identical to the one in cache
+            if (
+              this.fileCache[file.gcs.path] &&
+              this.fileCache[file.gcs.path] === remoteMetadata?.md5Hash
+            ) {
+              file.gcs.state = 'cache';
+              return cb(null, file);
+            }
+
+            // Skip: file exists, no updates allowed
+            const noUpdate = !!(
+              this.pluginOptions.createOnly && remoteMetadata?.md5Hash
             );
-          }
-        });
+
+            if (noUpdate) {
+              file.gcs.state = 'skip';
+              this.addToCache(file.gcs.path, remoteMetadata?.md5Hash);
+              cb(err, file);
+
+              // Update: files are different or file doesn't exist yet
+            } else {
+              file.gcs.state = !!remoteMetadata?.md5Hash ? 'update' : 'create';
+
+              this.client.upload(
+                `${file.base}/${file.gcs.path}`,
+                {
+                  // To avoid incorrect order of Vinyl metadata, set property inside of this block
+                  destination: file.gcs.path,
+                  contentType,
+                  gzip: true,
+                  // Omit below properties and let plugin handle it
+                  ...omit(uploadOptions, ['destination', 'contentType'])
+                },
+                (err, uploadedFile) => {
+                  if (err) {
+                    return cb(err);
+                  }
+
+                  this.addToCache(file.gcs.path, uploadedFile.metadata.md5Hash);
+                  cb(err, file);
+                }
+              );
+            }
+          });
+        }
       }
-    });
+    );
 
     stream.on('finish', () => this.saveCache());
 
@@ -201,7 +207,7 @@ export class Publisher {
       reportOptions = {};
     }
 
-    const stream = through.obj(function (file, enc, cb) {
+    const stream = throughConcurrent.obj((file, enc, cb) => {
       let state: string;
 
       if (!file.gcs) {
