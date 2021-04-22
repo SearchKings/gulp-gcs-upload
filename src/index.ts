@@ -1,309 +1,246 @@
 import {
   Bucket,
-  GetFileMetadataResponse,
   Storage,
   StorageOptions,
+  UploadOptions
 } from '@google-cloud/storage';
 import fs from 'fs';
-import through from 'through2';
-import zlib from 'zlib';
-import crypto from 'crypto';
+import throughConcurrent from 'through2-concurrent';
 import mime from 'mime-types';
-import { pascalCase } from 'pascal-case';
 import PluginError from 'plugin-error';
+import colors from 'ansi-colors';
+import fancyLog from 'fancy-log';
+import internal from 'stream';
+import Vinyl from 'vinyl';
+import omit from 'lodash.omit';
 
-const PLUGIN_NAME = 'gulp-awspublish';
-
-/**
- * calculate file hash
- * @param  {Buffer} buf
- * @return {String}
- *
- * @api private
- */
-
-function md5Hash(buf) {
-  return crypto.createHash('md5').update(buf).digest('hex');
-}
+import { PluginOptions, ReportOptions } from './types';
 
 /**
- * Determine the content type of a file based on charset and mime type.
- * @param  {Object} file
- * @return {String}
- *
- * @api private
+ * Uploads a stream of files to a Google Cloud Storage bucket
  */
-
-function getContentType(file) {
-  var mimeType =
-    mime.lookup(file.unzipPath || file.path) || 'application/octet-stream';
-  var charset = mime.charset(mimeType);
-
-  return charset ? mimeType + '; charset=' + charset.toLowerCase() : mimeType;
-}
-
-/**
- * Turn the HTTP style headers into AWS Object params
- */
-
-function toGcsParams(file) {
-  var params: any = {};
-
-  var headers = file.gcs.headers || {};
-
-  for (var header in headers) {
-    params[pascalCase(header)] = headers[header];
-  }
-
-  params.Key = file.gcs.path;
-  params.Body = file.contents;
-
-  return params;
-}
-
-/**
- * init file gcs hash
- * @param  {Vinyl} file file object
- *
- * @return {Vinyl} file
- * @api private
- */
-
-function initFile(file) {
-  if (!file.gcs) {
-    file.gcs = {};
-    file.gcs.headers = {};
-    file.gcs.path = file.relative.replace(/\\/g, '/');
-  }
-  return file;
-}
-
-/**
- * create a through stream that gzip files
- * file content is gziped and Content-Encoding is added to gcs.headers
- * @param  {Object} options
- *
- * options keys are:
- *   ext: extension to add to gzipped files
- *   smaller: whether to only gzip files if the result is smaller
- *
- * @return {Stream}
- * @api public
- */
-export const gzip = (options) => {
-  if (!options) options = {};
-  if (!options.ext) options.ext = '';
-
-  return through.obj(function (file, enc, cb) {
-    // Do nothing if no contents
-    if (file.isNull()) return cb();
-
-    // streams not supported
-    if (file.isStream()) {
-      this.emit(
-        'error',
-        new PluginError(PLUGIN_NAME, 'Stream content is not supported')
-      );
-      return cb();
-    }
-
-    // check if file.contents is a `Buffer`
-    if (file.isBuffer()) {
-      initFile(file);
-
-      // zip file
-      zlib.gzip(file.contents, options, function (err, buf) {
-        if (err) return cb(err);
-        if (options.smaller && buf.length >= file.contents.length)
-          return cb(err, file);
-        // add content-encoding header
-        file.gcs.headers['Content-Encoding'] = 'gzip';
-        file.unzipPath = file.path;
-        file.path += options.ext;
-        file.gcs.path += options.ext;
-        file.contents = buf;
-        cb(err, file);
-      });
-    }
-  });
-};
-
-class Publisher {
-  private config: StorageOptions;
+export class Uploader {
+  private cacheFilePath: string;
   private client: Bucket;
-  private cacheFile: string;
-  private fileCache: { [key: string]: string };
+  private fileCache: { [filePath: string]: string };
+  private pluginOptions: PluginOptions;
 
-  constructor(
-    bucketName: string,
-    storageOptions: StorageOptions,
-    cacheOptions
-  ) {
-    if (bucketName) {
-      throw new Error('Missing `params.Bucket` config value.');
+  constructor(pluginOptions: PluginOptions, storageOptions?: StorageOptions) {
+    if (!pluginOptions?.bucketName) {
+      throw new Error('Missing bucket name');
     }
 
-    this.config = storageOptions;
-    this.client = new Storage(this.config).bucket(bucketName);
+    this.pluginOptions = pluginOptions;
+    this.client = new Storage(storageOptions).bucket(pluginOptions.bucketName);
 
-    // init Cache file
-    this.cacheFile =
-      cacheOptions && cacheOptions.cacheFileName
-        ? cacheOptions.cacheFileName
-        : '.awspublish-' + bucketName;
+    // Init Cache file
+    this.cacheFilePath = pluginOptions.cacheFilePath
+      ? pluginOptions.cacheFilePath
+      : `.gcsupload-${pluginOptions.bucketName}`;
 
-    // load cache
+    // Load cache
     try {
-      this.fileCache = JSON.parse(
-        fs.readFileSync(this.getCacheFilename(), 'utf8')
-      );
+      this.fileCache = JSON.parse(fs.readFileSync(this.cacheFilePath, 'utf8'));
     } catch (err) {
       this.fileCache = {};
     }
   }
 
-  getCacheFilename(): string {
-    return this.cacheFile;
+  /**
+   * Adds some internal-only properties to a vinyl file
+   * @param file File to initialize properties on
+   * @returns Modified vinyl with with private properties
+   */
+  private initFile(file: Vinyl): Vinyl {
+    if (!file.gcs) {
+      file.gcs = {};
+      file.gcs.path = file.relative.replace(/\\/g, '/');
+    }
+
+    return file;
   }
 
-  saveCache() {
-    fs.writeFileSync(this.getCacheFilename(), JSON.stringify(this.fileCache));
+  /**
+   * Write the current cache to the destination cache file
+   */
+  private saveCache(): void {
+    fs.writeFileSync(this.cacheFilePath, JSON.stringify(this.fileCache));
   }
 
-  cache() {
-    let counter = 0;
+  /**
+   * Determine the content type of a file based on charset and mime type.
+   * @param file Vinyl file to get the content type for
+   * @returns Content type of the passed-in file
+   */
+  private getContentType(file: Vinyl): string {
+    const mimeType: string =
+      mime.lookup(file.unzipPath || file.path) || 'application/octet-stream';
 
-    var stream = through.obj((file, enc, cb) => {
-      if (file.gcs && file.gcs.path) {
-        // do nothing for file already cached
-        if (file.gcs.state === 'cache') return cb(null, file);
+    const charset: string | false = mime.charset(mimeType);
 
-        // remove deleted
-        if (file.gcs.state === 'delete') {
-          delete this.fileCache[file.gcs.path];
+    return charset ? mimeType + '; charset=' + charset.toLowerCase() : mimeType;
+  }
 
-          // update others
-        } else if (file.gcs.etag) {
-          this.fileCache[file.gcs.path] = file.gcs.etag;
+  /**
+   * Adds a file to the in-memory cache, to be persisted to disk later
+   * @param path Path of file to cache
+   * @param hash Hash of file to cache
+   */
+  private addToCache(path: string, hash: string): void {
+    this.fileCache[path] = hash;
+  }
+
+  /**
+   * Adds a file to the in-memory cache, to be persisted to disk later
+   * @param path Path of file to cache
+   * @param hash Hash of file to cache
+   */
+  private removeFromCache(path: string): void {
+    delete this.fileCache[path];
+  }
+
+  /**
+   * Upload the streamed files to the configured Google Cloud Storage bucket
+   * @param uploadOptions Google Cloud Storage upload options for each file
+   * @returns Stream that completes when uploading is done
+   */
+  public upload(uploadOptions?: UploadOptions): internal.Transform {
+    const stream = throughConcurrent.obj(
+      { maxConcurrency: this.pluginOptions.uploadConcurrency || 1 },
+      (file: Vinyl, enc, cb) => {
+        // Do nothing if no contents
+        if (file.isNull()) {
+          return cb();
         }
 
-        // save cache every 10 files
-        if (++counter % 10) this.saveCache();
+        // Streams not supported
+        if (file.isStream()) {
+          stream.emit(
+            'error',
+            new PluginError(
+              'gulp-gcs-upload',
+              'Stream content is not supported'
+            )
+          );
+          return cb();
+        }
+
+        // Check if file.contents is a `Buffer`
+        if (file.isBuffer()) {
+          this.initFile(file);
+
+          // Determine contentType
+          const contentType = this.getContentType(file);
+
+          // Get file metadata from GCS
+          this.client.file(file.gcs.path).getMetadata((err, remoteMetadata) => {
+            // Ignore 403 and 404 errors since we're checking if a file exists on gcs
+            if (err && [403, 404].indexOf(err.code) < 0) {
+              return cb(err);
+            } else {
+              // If the file isn't in the bucket, clear it from the cache, initialize empty metadata
+              if (!remoteMetadata) {
+                this.removeFromCache(file.gcs.path);
+              }
+            }
+
+            // Check if file is identical to the one in cache
+            if (
+              this.fileCache[file.gcs.path] &&
+              this.fileCache[file.gcs.path] === remoteMetadata?.md5Hash
+            ) {
+              file.gcs.state = 'cache';
+              return cb(null, file);
+            }
+
+            // Skip: file exists, no updates allowed
+            const noUpdate = !!(
+              this.pluginOptions.createOnly && remoteMetadata?.md5Hash
+            );
+
+            if (noUpdate) {
+              file.gcs.state = 'skip';
+              this.addToCache(file.gcs.path, remoteMetadata?.md5Hash);
+              cb(err, file);
+
+              // Update: files are different or file doesn't exist yet
+            } else {
+              file.gcs.state = !!remoteMetadata?.md5Hash ? 'update' : 'create';
+
+              this.client.upload(
+                `${file.base}/${file.gcs.path}`,
+                {
+                  destination: file.gcs.path,
+                  contentType,
+                  gzip: true,
+                  // Omit below properties and let plugin handle it
+                  ...omit(uploadOptions, ['destination', 'contentType'])
+                },
+                (err, uploadedFile) => {
+                  if (err) {
+                    return cb(err);
+                  }
+
+                  this.addToCache(file.gcs.path, uploadedFile.metadata.md5Hash);
+                  cb(err, file);
+                }
+              );
+            }
+          });
+        }
       }
+    );
 
-      cb(null, file);
-    });
-
-    stream.on('finish', this.saveCache);
+    stream.on('finish', () => this.saveCache());
 
     return stream;
   }
 
-  publish(headers, options) {
-    var _this = this;
+  /**
+   * Logs the state of the file stream, indicating which files were created or updated
+   * @param reportOptions Options containing a list of states to report on
+   * @returns Stream containing the report results
+   */
+  public report(reportOptions?: ReportOptions): internal.Transform {
+    if (!reportOptions) {
+      reportOptions = {};
+    }
 
-    // init opts
-    if (!options) options = { force: false };
+    const stream = throughConcurrent.obj((file, enc, cb) => {
+      let state: string;
 
-    // init param object
-    if (!headers) headers = {};
-
-    return through.obj(function (file, enc, cb) {
-      var header, etag;
-
-      // Do nothing if no contents
-      if (file.isNull()) return cb();
-
-      // streams not supported
-      if (file.isStream()) {
-        this.emit(
-          'error',
-          new PluginError(PLUGIN_NAME, 'Stream content is not supported')
-        );
-        return cb();
+      if (!file.gcs) {
+        return cb(null, file);
       }
 
-      // check if file.contents is a `Buffer`
-      if (file.isBuffer()) {
-        initFile(file);
-
-        // calculate etag
-        etag = '"' + md5Hash(file.contents) + '"';
-
-        // delete - stop here
-        if (file.gcs.state === 'delete') return cb(null, file);
-
-        // check if file is identical as the one in cache
-        if (!options.force && _this.fileCache[file.gcs.path] === etag) {
-          file.gcs.state = 'cache';
-          return cb(null, file);
-        }
-
-        // add content-type header
-        if (!file.gcs.headers['Content-Type'])
-          file.gcs.headers['Content-Type'] = getContentType(file);
-
-        // add content-length header
-        if (!file.gcs.headers['Content-Length'])
-          file.gcs.headers['Content-Length'] = file.contents.length;
-
-        // add extra headers
-        for (header in headers) file.gcs.headers[header] = headers[header];
-
-        if (options.simulate) return cb(null, file);
-
-        // get gcs headers
-        _this.client
-          .file(file.gcs.path)
-          .getMetadata(function (err, [res]: GetFileMetadataResponse) {
-            //ignore 403 and 404 errors since we're checking if a file exists on gcs
-            if (err && [403, 404].indexOf(err.statusCode) < 0) return cb(err);
-
-            res = res || {};
-
-            // skip: no updates allowed
-            var noUpdate = options.createOnly && res.etag;
-
-            // skip: file are identical
-            var noChange = !options.force && res.etag === etag;
-
-            if (noUpdate || noChange) {
-              file.gcs.state = 'skip';
-              file.gcs.etag = etag;
-              file.gcs.date = new Date(res.updated);
-              cb(err, file);
-
-              // update: file are different
-            } else {
-              file.gcs.state = res.etag ? 'update' : 'create';
-
-              _this.client.upload(file.gcs.path, function (err) {
-                if (err) return cb(err);
-
-                file.gcs.date = new Date();
-                file.gcs.etag = etag;
-                cb(err, file);
-              });
-            }
-          });
+      if (!file.gcs.state) {
+        return cb(null, file);
       }
+
+      if (
+        reportOptions.states &&
+        reportOptions.states.indexOf(file.gcs.state) === -1
+      ) {
+        return cb(null, file);
+      }
+
+      state = `[${file.gcs.state}]`;
+
+      switch (file.gcs.state) {
+        case 'create':
+          state = colors.green(state);
+          break;
+        default:
+          state = colors.cyan(state);
+          break;
+      }
+
+      fancyLog(state, file.gcs.path);
+      cb(null, file);
     });
+
+    stream.resume();
+
+    return stream;
   }
 }
-/**
- * Shortcut for `new Publisher()`.
- *
- * @param {Object} StorageOptions
- * @param {Object} cacheOptions
- * @return {Publisher}
- *
- * @api public
- */
-
-export const create = (
-  bucketName: string,
-  storageOptions: StorageOptions,
-  cacheOptions
-) => {
-  return new Publisher(bucketName, storageOptions, cacheOptions);
-};

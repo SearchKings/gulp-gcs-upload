@@ -1,49 +1,53 @@
 {
-  "name": "gulp-gcs-upload",
+  "name": "@searchkings/gulp-gcs-upload",
   "version": "0.0.0",
   "description": "Gulp plugin to upload to Google Cloud Storage",
-  "main": "build/main/index.js",
-  "typings": "build/main/index.d.ts",
-  "module": "build/module/index.js",
-  "repository": "https://github.com/rosslavery/gulp-gcs-upload",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "repository": "https://github.com/SearchKings/gulp-gcs-upload",
   "license": "MIT",
   "keywords": [],
   "scripts": {
-    "build": "run-s clean && run-p build:*",
-    "build:main": "tsc -p tsconfig.json",
-    "build:watch": "./node_modules/.bin/tsc-watch --onSuccess \"node ./build/main/index.js\"",
-    "build:module": "tsc -p tsconfig.module.json",
-    "fix": "run-s fix:*",
-    "fix:prettier": "prettier \"src/**/*.ts\" --write",
-    "fix:tslint": "tslint --fix --project .",
-    "watch": "run-s clean build:watch",
-    "reset": "git clean -dfx && git reset --hard && npm i",
-    "clean": "trash build test"
+    "lint": "npx eslint \"src/**/*.ts\"",
+    "build": "npx tsc",
+    "start": "npx tsc -w",
+    "prettier:all": "npx prettier --write \"**/*ts\"",
+    "prettier:check:all": "npx prettier --check --config ./.prettierrc \"**/*ts\"",
+    "prettier:staged": "npx pretty-quick --staged"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run pre-commit:verify"
+    }
   },
   "engines": {
-    "node": ">=8.9"
+    "node": "12"
   },
   "dependencies": {
-    "@google-cloud/storage": "^5.8.3",
-    "lodash.chunk": "^4.2.0",
+    "@google-cloud/storage": "^5.8.4",
+    "@types/vinyl": "^2.0.4",
+    "ansi-colors": "^4.1.1",
+    "fancy-log": "^1.3.3",
+    "lodash.omit": "^4.5.0",
     "mime-types": "^2.1.30",
-    "pascal-case": "^3.1.2",
     "plugin-error": "^1.0.1",
-    "through2": "^4.0.1",
+    "through2-concurrent": "^2.0.0",
     "vinyl": "^2.2.1"
   },
   "devDependencies": {
-    "@types/lodash.chunk": "^4.2.6",
+    "@types/fancy-log": "^1.3.1",
+    "@types/lodash.omit": "^4.5.6",
+    "@types/mime-types": "^2.1.0",
     "@types/node": "^14.14.41",
-    "@types/through2": "^2.0.36",
-    "@types/vinyl": "^2.0.4",
-    "npm-run-all": "^4.1.5",
+    "@types/through2-concurrent": "^2.0.0",
+    "@typescript-eslint/eslint-plugin": "^4.22.0",
+    "@typescript-eslint/parser": "^4.22.0",
+    "eslint": "^7.24.0",
+    "eslint-config-prettier": "^8.2.0",
+    "eslint-plugin-prettier": "^3.4.0",
+    "husky": "^6.0.0",
     "prettier": "^2.2.1",
-    "trash-cli": "^4.0.0",
-    "tsc-watch": "^4.2.9",
+    "pretty-quick": "^3.1.0",
     "typescript": "^4.2.4"
-  },
-  "prettier": {
-    "singleQuote": true
   }
 }
