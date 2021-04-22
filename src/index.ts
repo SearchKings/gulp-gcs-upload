@@ -170,7 +170,6 @@ export class Publisher {
               this.client.upload(
                 `${file.base}/${file.gcs.path}`,
                 {
-                  // To avoid incorrect order of Vinyl metadata, set property inside of this block
                   destination: file.gcs.path,
                   contentType,
                   gzip: true,
