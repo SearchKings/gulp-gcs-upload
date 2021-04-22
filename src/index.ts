@@ -19,13 +19,13 @@ import { PluginOptions, ReportOptions } from './types';
 /**
  * Uploads a stream of files to a Google Cloud Storage bucket
  */
-export class Publisher {
+export class Uploader {
   private cacheFilePath: string;
   private client: Bucket;
   private fileCache: { [filePath: string]: string };
   private pluginOptions: PluginOptions;
 
-  constructor(pluginOptions: PluginOptions, storageOptions: StorageOptions) {
+  constructor(pluginOptions: PluginOptions, storageOptions?: StorageOptions) {
     if (!pluginOptions?.bucketName) {
       throw new Error('Missing bucket name');
     }
@@ -36,7 +36,7 @@ export class Publisher {
     // Init Cache file
     this.cacheFilePath = pluginOptions.cacheFilePath
       ? pluginOptions.cacheFilePath
-      : `.gcspublish-${pluginOptions.bucketName}`;
+      : `.gcsupload-${pluginOptions.bucketName}`;
 
     // Load cache
     try {
@@ -100,11 +100,11 @@ export class Publisher {
   }
 
   /**
-   * Publish the streamed files to the configured Google Cloud Storage bucket
+   * Upload the streamed files to the configured Google Cloud Storage bucket
    * @param uploadOptions Google Cloud Storage upload options for each file
    * @returns Stream that completes when uploading is done
    */
-  public publish(uploadOptions?: UploadOptions): internal.Transform {
+  public upload(uploadOptions?: UploadOptions): internal.Transform {
     const stream = throughConcurrent.obj(
       { maxConcurrency: this.pluginOptions.uploadConcurrency || 1 },
       (file: Vinyl, enc, cb) => {

@@ -1,4 +1,4 @@
-# Searchkings Gulp GCS Upload
+# Gulp GCS Upload
 
 Upload files to Google Cloud Storage with Gulp
 
@@ -17,38 +17,31 @@ npm install @searchkings/gulp-gcs-upload
 ## Usage Example
 
 ```ts
-import { Publisher } from '@searchkings/gulp-gcs-upload';
+import { Uploader } from '@searchkings/gulp-gcs-upload';
 
 const bucketName: string = 'cdn-bucket';
-const publisher: Publisher = new Publisher(
-  {
-    bucketName,
-    cacheFilePath: path.resolve(homedir(), `.gcspublish-${bucketName}`),
-    createOnly: true,
-    uploadConcurrency: 20
-  },
-  {
-    // To generate credentials: `gcloud auth application-default login --project <PROJECT_ID>`
-    keyFilename: resolve(
-      homedir(),
-      '.config/gcloud/application_default_credentials.json'
-    )
-  }
-);
+const uploader = new Uploader({
+  bucketName,
+  cacheFilePath: path.resolve(homedir(), `.gcsupload-${bucketName}`),
+  createOnly: true,
+  uploadConcurrency: 20
+});
 
 return gulp
   .src(`${GLOBALS.CDN_COMMON_PATH}/**`)
-  .pipe(publisher.publish())
-  .pipe(publisher.report());
+  .pipe(uploader.upload())
+  .pipe(uploader.report());
 ```
 
 ## API
 
-### Publisher
+### Uploader
 
-**constructor(pluginOptions: PluginOptions, storageOptions: [StorageOptions](https://googleapis.dev/nodejs/storage/latest/global.html#StorageOptions))**
+**constructor(pluginOptions: PluginOptions, storageOptions?: [StorageOptions](https://googleapis.dev/nodejs/storage/latest/global.html#StorageOptions))**
 
-Create a new uploader with a set of plugin options and storage options. **Note:** you must specify your preferred authentication method inside of the storage options.
+Create a new uploader with a set of plugin options and storage options.
+
+**Note:** If you are not using [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/production#automatically), you must specify your preferred authentication method inside of the storage options.
 
 ```ts
 interface PluginOptions {
@@ -66,13 +59,13 @@ interface PluginOptions {
 }
 ```
 
-**.publish(uploadOptions?: [UploadOptions](https://googleapis.dev/nodejs/storage/latest/global.html#UploadOptions))**
+**.upload(uploadOptions?: [UploadOptions](https://googleapis.dev/nodejs/storage/latest/global.html#UploadOptions))**
 
 Uploads your stream of files to the GCS bucket with optional upload options you define.
 
 **.report(reportOptions?: ReportOptions)**
 
-Outputs a report with the state of each file that passed through the `.publish()` stream.
+Outputs a report with the state of each file that passed through the `.upload()` stream.
 
 ```ts
 type FileState = 'cache' | 'skip' | 'update' | 'create';
