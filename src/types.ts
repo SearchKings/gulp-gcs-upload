@@ -1,6 +1,6 @@
 export interface PluginOptions {
   bucketName: string;
-  cacheFile?: string;
+  cacheFilePath?: string;
   createOnly?: boolean;
 }
 

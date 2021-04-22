@@ -21,7 +21,7 @@ import { PluginOptions, ReportOptions } from './types';
  * Uploads a stream of files to a Google Cloud Storage bucket
  */
 export class Publisher {
-  private cacheFile: string;
+  private cacheFilePath: string;
   private client: Bucket;
   private fileCache: { [filePath: string]: string };
   private pluginOptions: PluginOptions;
@@ -35,13 +35,13 @@ export class Publisher {
     this.client = new Storage(storageOptions).bucket(pluginOptions.bucketName);
 
     // Init Cache file
-    this.cacheFile = pluginOptions.cacheFile
-      ? pluginOptions.cacheFile
+    this.cacheFilePath = pluginOptions.cacheFilePath
+      ? pluginOptions.cacheFilePath
       : `.gcspublish-${pluginOptions.bucketName}`;
 
     // Load cache
     try {
-      this.fileCache = JSON.parse(fs.readFileSync(this.cacheFile, 'utf8'));
+      this.fileCache = JSON.parse(fs.readFileSync(this.cacheFilePath, 'utf8'));
     } catch (err) {
       this.fileCache = {};
     }
@@ -74,7 +74,7 @@ export class Publisher {
    * Write the current cache to the destination cache file
    */
   private saveCache(): void {
-    fs.writeFileSync(this.cacheFile, JSON.stringify(this.fileCache));
+    fs.writeFileSync(this.cacheFilePath, JSON.stringify(this.fileCache));
   }
 
   /**
@@ -92,35 +92,12 @@ export class Publisher {
   }
 
   /**
-   * Used to pipe upload results into a cache file to avoid re-uploading later
-   * @returns Stream that completes when caching is done
+   * Adds a file to the in-memory cache, to be persisted to disk later
+   * @param path Path of file to cache
+   * @param hash Hash of file to cache
    */
-  public cache(): internal.Transform {
-    let counter: number = 0;
-
-    const stream = through.obj((file, enc, cb) => {
-      if (file.gcs && file.gcs.path) {
-        // Do nothing for files already cached
-        if (file.gcs.state === 'cache') {
-          return cb(null, file);
-        }
-
-        if (file.gcs.etag) {
-          this.fileCache[file.gcs.path] = file.gcs.etag;
-        }
-
-        // Save cache every 10 files
-        if (++counter % 10) {
-          this.saveCache();
-        }
-      }
-
-      cb(null, file);
-    });
-
-    stream.on('finish', () => this.saveCache());
-
-    return stream;
+  private addToCache(path: string, hash: string): void {
+    this.fileCache[path] = hash;
   }
 
   /**
@@ -131,7 +108,7 @@ export class Publisher {
   public publish(uploadOptions?: UploadOptions): internal.Transform {
     const _this: this = this;
 
-    return through.obj(function (file: Vinyl, enc, cb) {
+    const stream = through.obj(function (file: Vinyl, enc, cb) {
       // Do nothing if no contents
       if (file.isNull()) {
         return cb();
@@ -153,15 +130,6 @@ export class Publisher {
         // Determine contentType
         const contentType = _this.getContentType(file);
 
-        // Calculate etag
-        const etag = `"${_this.md5Hash(file.contents)}"`;
-
-        // Check if file is identical to the one in cache
-        if (_this.fileCache[file.gcs.path] === etag) {
-          file.gcs.state = 'cache';
-          return cb(null, file);
-        }
-
         // Get file metadata from GCS
         _this.client.file(file.gcs.path).getMetadata((err, metadata) => {
           // Ignore 403 and 404 errors since we're checking if a file exists on gcs
@@ -171,20 +139,28 @@ export class Publisher {
             metadata = metadata || {};
           }
 
+          // Check if file is identical to the one in cache
+          if (
+            _this.fileCache[file.gcs.path] &&
+            _this.fileCache[file.gcs.path] === metadata.md5Hash
+          ) {
+            file.gcs.state = 'cache';
+            return cb(null, file);
+          }
+
           // Skip: file exists, no updates allowed
-          const noUpdate = !!(_this.pluginOptions.createOnly && metadata.etag);
+          const noUpdate = !!(
+            _this.pluginOptions.createOnly && metadata.md5Hash
+          );
 
-          // Skip: file are identical
-          const noChange = !!(metadata.etag === etag);
-
-          if (noUpdate || noChange) {
+          if (noUpdate) {
             file.gcs.state = 'skip';
-            file.gcs.etag = etag;
+            _this.addToCache(file.gcs.path, metadata.md5Hash);
             cb(err, file);
 
             // Update: files are different or file doesn't exist yet
           } else {
-            file.gcs.state = !!metadata.etag ? 'update' : 'create';
+            file.gcs.state = !!metadata.md5Hash ? 'update' : 'create';
 
             _this.client.upload(
               `${file.base}/${file.gcs.path}`,
@@ -196,12 +172,12 @@ export class Publisher {
                 // Omit below properties and let plugin handle it
                 ...omit(uploadOptions, ['destination', 'contentType'])
               },
-              err => {
+              (err, uploadedFile) => {
                 if (err) {
                   return cb(err);
                 }
 
-                file.gcs.etag = etag;
+                _this.addToCache(file.gcs.path, uploadedFile.metadata.md5Hash);
                 cb(err, file);
               }
             );
@@ -209,6 +185,10 @@ export class Publisher {
         });
       }
     });
+
+    stream.on('finish', () => this.saveCache());
+
+    return stream;
   }
 
   /**
