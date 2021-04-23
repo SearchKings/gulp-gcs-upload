@@ -8,6 +8,7 @@
   "license": "MIT",
   "keywords": [],
   "scripts": {
+    "semantic-release": "semantic-release",
     "lint": "npx eslint \"src/**/*.ts\"",
     "build": "npx tsc",
     "start": "npx tsc -w",
