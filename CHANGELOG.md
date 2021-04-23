@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.0...v1.0.1) (2021-04-23)
+
+
+### Bug Fixes
+
+* bump release to allow first semantic-release ([6a4ad87](https://github.com/SearchKings/gulp-gcs-upload/commit/6a4ad87533d8ab8bc93b2a7a86b0323aa9c59dbf))
+
 # 1.0.0 (2021-04-23)
 
 
