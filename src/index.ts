@@ -91,9 +91,8 @@ export class Uploader {
   }
 
   /**
-   * Adds a file to the in-memory cache, to be persisted to disk later
+   * Removes a file cache from the in-memory cache, to be persisted to disk later
    * @param path Path of file to cache
-   * @param hash Hash of file to cache
    */
   private removeFromCache(path: string): void {
     delete this.fileCache[path];
@@ -138,7 +137,7 @@ export class Uploader {
             if (err && [403, 404].indexOf(err.code) < 0) {
               return cb(err);
             } else {
-              // If the file isn't in the bucket, clear it from the cache, initialize empty metadata
+              // If the file isn't in the bucket, clear it from the cache
               if (!remoteMetadata) {
                 this.removeFromCache(file.gcs.path);
               }
@@ -206,7 +205,7 @@ export class Uploader {
       reportOptions = {};
     }
 
-    const stream = throughConcurrent.obj((file, enc, cb) => {
+    const stream = throughConcurrent.obj((file: Vinyl, enc, cb) => {
       let state: string;
 
       if (!file.gcs) {
