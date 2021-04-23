@@ -1,0 +1,15 @@
+name: Cancel Duplicates
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+
+jobs:
+  cancel-duplicates:
+    name: Cancel Duplicate Actions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: fauguste/auto-cancellation-running-action@master
+        with:
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
