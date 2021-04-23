@@ -91,7 +91,7 @@ export class Uploader {
   }
 
   /**
-   * Removes a file cache from the cache file
+   * Removes a file cache from the in-memory cache, to be persisted to disk later
    * @param path Path of file to cache
    */
   private removeFromCache(path: string): void {
