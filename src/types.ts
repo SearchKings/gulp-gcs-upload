@@ -6,7 +6,7 @@ export interface PluginOptions {
 }
 
 export interface ReportOptions {
-  states?: FileState;
+  states?: FileState[];
 }
 
 type FileState = 'cache' | 'skip' | 'update' | 'create';
