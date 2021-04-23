@@ -1,4 +1,4 @@
-# Gulp GCS Upload
+# Gulp Google Cloud Storage Upload
 
 Upload files to Google Cloud Storage with Gulp
 
