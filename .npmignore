@@ -9,4 +9,3 @@ tsconfig.json
 **/*.spec.*
 *.log
 **/*.tgz
-dist/**/*.map
