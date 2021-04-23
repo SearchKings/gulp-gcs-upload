@@ -1,4 +1,4 @@
-# Gulp GCS Upload
+# Gulp Google Cloud Storage Upload
 
 Upload files to Google Cloud Storage with Gulp
 
@@ -51,7 +51,7 @@ interface PluginOptions {
   // Local directory and file to store a cache of previously-uploaded files
   cacheFilePath?: string;
 
-  // Whether a file can be updated if it already exists. Default: false
+  // If true, files are considered immutable once uploaded, and will not be overwritten if a file with the same name exists. Default: false
   createOnly?: boolean;
 
   // Number of simultaneous file uploads. Default: 1
