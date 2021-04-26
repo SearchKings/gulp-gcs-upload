@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.1...v1.0.2) (2021-04-26)
+
+
+### Bug Fixes
+
+* add missing build command for npm publishing ([#4](https://github.com/SearchKings/gulp-gcs-upload/issues/4)) ([1c190e4](https://github.com/SearchKings/gulp-gcs-upload/commit/1c190e43ad283e85f3d26cd0fb96fb0bf06c2573))
+
 ## [1.0.1](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.0...v1.0.1) (2021-04-23)
 
 
