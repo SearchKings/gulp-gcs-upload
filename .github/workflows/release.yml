@@ -53,6 +53,7 @@ jobs:
         run: |
           npm config set //registry.npmjs.org/:_authToken ${NPM_TOKEN}
           npm ci
+          npm run build
           npm run semantic-release
 
   merge-release:
