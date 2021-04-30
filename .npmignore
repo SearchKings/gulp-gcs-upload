@@ -2,6 +2,7 @@ src
 test
 tsconfig.json
 .eslintrc.json
+.releaserc.json
 .github
 .prettierignore
 .prettierrc
@@ -9,3 +10,4 @@ tsconfig.json
 **/*.spec.*
 *.log
 **/*.tgz
+.env
