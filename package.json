@@ -12,7 +12,8 @@
     "lint": "npx eslint \"src/**/*.ts\"",
     "build": "npx tsc",
     "start": "npx tsc -w",
-    "test": "npx mocha --require ts-node/register test/**/*.ts",
+    "test": "npx mocha --require ts-node/register test/index.ts",
+    "test:upload": "npx mocha --require ts-node/register test/upload.ts",
     "prettier:all": "npx prettier --write \"**/*ts\"",
     "prettier:check:all": "npx prettier --check --config ./.prettierrc \"**/*ts\"",
     "prettier:staged": "npx pretty-quick --staged"
@@ -38,6 +39,7 @@
   "devDependencies": {
     "@semantic-release/changelog": "^5.0.1",
     "@semantic-release/git": "^9.0.0",
+    "@types/chai": "^4.2.17",
     "@types/event-stream": "^3.3.34",
     "@types/fancy-log": "^1.3.1",
     "@types/lodash.omit": "^4.5.6",
@@ -48,6 +50,7 @@
     "@types/vinyl": "^2.0.4",
     "@typescript-eslint/eslint-plugin": "^4.22.0",
     "@typescript-eslint/parser": "^4.22.0",
+    "chai": "^4.3.4",
     "dotenv": "^8.2.0",
     "eslint": "^7.24.0",
     "eslint-config-prettier": "^8.2.0",

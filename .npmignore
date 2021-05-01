@@ -11,3 +11,4 @@ tsconfig.json
 *.log
 **/*.tgz
 .env
+test/cache

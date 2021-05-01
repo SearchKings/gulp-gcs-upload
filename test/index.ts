@@ -1,25 +1,31 @@
 import Vinyl from 'vinyl';
 import { Uploader } from '../src/index';
-import dotenv from 'dotenv';
-import internal from 'node:stream';
+import { expect } from 'chai';
+import internal from 'stream';
+import { RequestError } from 'teeny-request';
 
-dotenv.config();
+const bucketName: string = 'fake-bucket';
+const fakeFile: Vinyl.BufferFile = new Vinyl({
+  path: 'test/fixtures/hello.txt',
+  contents: Buffer.from('hello')
+});
 
-describe('Upload', () => {
-  const fakeFile: Vinyl.BufferFile = new Vinyl({
-    path: 'test/fixtures/hello.txt',
-    contents: Buffer.from('hello')
-  });
+const uploader: Uploader = new Uploader({
+  bucketName,
+  cacheFilePath: `./test/cache/.gcsupload-${bucketName}`
+});
 
-  it('should upload successfully to the bucket', done => {
-    const uploader: Uploader = new Uploader({
-      bucketName: process.env.BUCKET_NAME
+describe('gulp-gcs-upload', () => {
+  it('should emit error when using invalid bucket', done => {
+    const stream: internal.Transform = uploader.upload();
+
+    stream.on('error', (err: RequestError) => {
+      expect(err).to.be.ok;
+      expect(err.code).to.eq(403);
+      done();
     });
 
-    const upload: internal.Transform = uploader.upload();
-
-    upload.write(fakeFile);
-
-    upload.on('data', () => done()).on('error', done);
+    stream.write(fakeFile);
+    stream.end();
   });
 });
