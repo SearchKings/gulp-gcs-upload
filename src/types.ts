@@ -9,4 +9,4 @@ export interface ReportOptions {
   states?: FileState[];
 }
 
-type FileState = 'cache' | 'skip' | 'update' | 'create';
+export type FileState = 'cache' | 'skip' | 'update' | 'create';
