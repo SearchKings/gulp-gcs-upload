@@ -1,23 +1,29 @@
-import Vinyl from 'vinyl';
-import { Uploader } from '../src/index';
-import { expect } from 'chai';
-import internal from 'stream';
+import * as fs from 'fs';
 import dotenv from 'dotenv';
 import eventStream from 'event-stream';
+import internal from 'stream';
+import Vinyl from 'vinyl';
+import { expect } from 'chai';
 import { RequestError } from 'teeny-request';
-import * as fs from 'fs';
-import { FileState, PluginOptions } from '../src/types';
 import { Storage } from '@google-cloud/storage';
+import { Uploader } from '../src/index';
+
+import { FileState, PluginOptions } from '../src/types';
 
 dotenv.config();
 
-const bucketName: string = process.env.BUCKET_NAME;
 const cacheFolder: string = './test/cache';
 const testFilePath: string = 'test/fixtures/hello.txt';
 const fakeFile: Vinyl.BufferFile = new Vinyl({
   path: testFilePath,
   contents: Buffer.from('hello')
 });
+const bucketName: string = process.env.BUCKET_NAME;
+
+let pluginSettings: PluginOptions = {
+  bucketName,
+  cacheFilePath: `./test/cache/.gcsupload-${bucketName}`
+};
 
 describe('gulp-gcs-upload', () => {
   before(async () => {
@@ -30,7 +36,7 @@ describe('gulp-gcs-upload', () => {
       await Promise.all([
         // Create a folder for cache file
         fs.mkdirSync(cacheFolder),
-        // Make sure no test cache file exist first for every full test
+        // Make sure no test cache file exist on bucket for every full test
         removeTestFileFromBucket()
       ]);
     } catch (err) {
@@ -84,27 +90,15 @@ describe('gulp-gcs-upload', () => {
     // Remove cache file from previous test
     fs.unlinkSync(`./test/cache/.gcsupload-${bucketName}`);
 
-    uploadTestCore('skip', done, {
-      bucketName,
-      createOnly: true,
-      cacheFilePath: `./test/cache/.gcsupload-${bucketName}`
-    });
+    // `createOnly` test
+    pluginSettings = { ...pluginSettings, createOnly: true };
+
+    uploadTestCore('skip', done);
   });
 });
 
-function uploadTestCore(
-  fileState: FileState,
-  done: Mocha.Done,
-  pluginOptions?: PluginOptions
-): void {
-  const uploader: Uploader = new Uploader(
-    pluginOptions
-      ? pluginOptions
-      : {
-          bucketName,
-          cacheFilePath: `./test/cache/.gcsupload-${bucketName}`
-        }
-  );
+function uploadTestCore(fileState: FileState, done: Mocha.Done): void {
+  const uploader: Uploader = new Uploader(pluginSettings);
 
   const stream: internal.Transform = uploader.upload();
 

@@ -13,7 +13,6 @@
     "build": "npx tsc",
     "start": "npx tsc -w",
     "test": "npx mocha --require ts-node/register test/index.ts",
-    "test:upload": "npx mocha --require ts-node/register test/upload.ts",
     "prettier:all": "npx prettier --write \"**/*ts\"",
     "prettier:check:all": "npx prettier --check --config ./.prettierrc \"**/*ts\"",
     "prettier:staged": "npx pretty-quick --staged"
