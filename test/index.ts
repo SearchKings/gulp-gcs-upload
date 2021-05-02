@@ -5,24 +5,25 @@ import internal from 'stream';
 import Vinyl from 'vinyl';
 import { expect } from 'chai';
 import { RequestError } from 'teeny-request';
-import { Storage } from '@google-cloud/storage';
+import { Bucket, Storage } from '@google-cloud/storage';
 import { Uploader } from '../src/index';
 
 import { FileState, PluginOptions } from '../src/types';
 
 dotenv.config();
 
+const bucketName: string = process.env.BUCKET_NAME;
 const cacheFolder: string = './test/cache';
 const testFilePath: string = 'test/fixtures/hello.txt';
+const cacheFilePath: string = `${cacheFolder}/.gcsupload-${bucketName}`;
 const fakeFile: Vinyl.BufferFile = new Vinyl({
   path: testFilePath,
   contents: Buffer.from('hello')
 });
-const bucketName: string = process.env.BUCKET_NAME;
 
 let pluginSettings: PluginOptions = {
   bucketName,
-  cacheFilePath: `./test/cache/.gcsupload-${bucketName}`
+  cacheFilePath
 };
 
 describe('gulp-gcs-upload', () => {
@@ -82,13 +83,13 @@ describe('gulp-gcs-upload', () => {
 
   it('should update existing file on bucket – state: update)', done => {
     // Remove cache file from previous test
-    fs.unlinkSync(`./test/cache/.gcsupload-${bucketName}`);
+    fs.unlinkSync(cacheFilePath);
     uploadTestCore('update', done);
   });
 
   it('should skip updating an existing file on bucket – state: skip)', done => {
     // Remove cache file from previous test
-    fs.unlinkSync(`./test/cache/.gcsupload-${bucketName}`);
+    fs.unlinkSync(cacheFilePath);
 
     // `createOnly` test
     pluginSettings = { ...pluginSettings, createOnly: true };
@@ -116,7 +117,7 @@ function uploadTestCore(fileState: FileState, done: Mocha.Done): void {
 }
 
 function removeTestFileFromBucket(): void {
-  const bucker = new Storage().bucket(process.env.BUCKET_NAME);
+  const bucker: Bucket = new Storage().bucket(process.env.BUCKET_NAME);
 
   if (bucker.file(testFilePath).exists()) {
     bucker.file(testFilePath).delete();
