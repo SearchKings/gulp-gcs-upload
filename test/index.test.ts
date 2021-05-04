@@ -3,7 +3,6 @@ import dotenv from 'dotenv';
 import eventStream from 'event-stream';
 import internal from 'stream';
 import Vinyl from 'vinyl';
-import { expect } from 'chai';
 import { RequestError } from 'teeny-request';
 import { Bucket, Storage } from '@google-cloud/storage';
 import { Uploader } from '../src/index';
@@ -26,68 +25,66 @@ let pluginSettings: PluginOptions = {
   cacheFilePath
 };
 
+beforeAll(async () => {
+  try {
+    if (fs.existsSync(cacheFolder)) {
+      // Clear all files under cache folder
+      await fs.rmdirSync(cacheFolder, { recursive: true });
+    }
+
+    await Promise.all([
+      // Create a folder for cache file
+      fs.mkdirSync(cacheFolder),
+      // Make sure no test cache file exist on bucket for every full test
+      removeTestFileFromBucket()
+    ]);
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+afterAll(async () => {
+  try {
+    // Clean up after all tests
+    await Promise.all([
+      fs.rmdirSync(cacheFolder, { recursive: true }),
+      removeTestFileFromBucket()
+    ]);
+  } catch (err) {
+    console.error(err);
+  }
+});
+
 describe('gulp-gcs-upload', () => {
-  before(async () => {
-    try {
-      if (fs.existsSync(cacheFolder)) {
-        // Clear all files under cache folder
-        await fs.rmdirSync(cacheFolder, { recursive: true });
-      }
-
-      await Promise.all([
-        // Create a folder for cache file
-        fs.mkdirSync(cacheFolder),
-        // Make sure no test cache file exist on bucket for every full test
-        removeTestFileFromBucket()
-      ]);
-    } catch (err) {
-      console.error(err);
-    }
-  });
-
-  after(async () => {
-    try {
-      // Clean up after all tests
-      await Promise.all([
-        fs.rmdirSync(cacheFolder, { recursive: true }),
-        removeTestFileFromBucket()
-      ]);
-    } catch (err) {
-      console.error(err);
-    }
-  });
-
-  it('should emit error when using invalid bucket', done => {
+  test('should emit error when using invalid bucket', done => {
     const fakeBucketName = 'fake-bucket';
     const uploader: Uploader = new Uploader({
       bucketName: fakeBucketName,
       cacheFilePath: `./test/cache/.gcsupload-${fakeBucketName}`
     });
     const stream: internal.Transform = uploader.upload();
-
     stream.on('error', (err: RequestError) => {
-      expect(err).to.be.ok;
-      expect(err.code).to.eq(403);
+      expect(err).toBeTruthy();
+      expect(err.code).toEqual(403);
       done();
     });
-
     stream.write(fakeFile);
     stream.end();
   });
 
-  it('should create a new file on bucket – state: create)', done =>
+  test('should create a new file on bucket – state: create)', done =>
     uploadTestCore('create', done));
 
-  it('should not create or update cached file to bucket – state: cache)', done =>
+  test('should not create or update cached file to bucket – state: cache)', done =>
     uploadTestCore('cache', done));
 
-  it('should update existing file on bucket – state: update)', done => {
+  test('should update existing file on bucket – state: update)', done => {
     // Remove cache file from previous test
     fs.unlinkSync(cacheFilePath);
     uploadTestCore('update', done);
   });
 
-  it('should skip updating an existing file on bucket – state: skip)', done => {
+  test('should skip updating an existing file on bucket – state: skip)', done => {
     // Remove cache file from previous test
     fs.unlinkSync(cacheFilePath);
 
@@ -98,16 +95,16 @@ describe('gulp-gcs-upload', () => {
   });
 });
 
-function uploadTestCore(fileState: FileState, done: Mocha.Done): void {
+function uploadTestCore(fileState: FileState, done: jest.DoneCallback): void {
   const uploader: Uploader = new Uploader(pluginSettings);
 
   const stream: internal.Transform = uploader.upload();
 
   stream.pipe(
     eventStream.writeArray((err, files) => {
-      expect(err).not.to.exist;
-      expect(files).to.have.length(1);
-      expect(files[0].gcs.state).to.eq(fileState);
+      expect(err).toBeNull();
+      expect(files).toHaveLength(1);
+      expect(files[0].gcs.state).toEqual(fileState);
       done(err);
     })
   );
