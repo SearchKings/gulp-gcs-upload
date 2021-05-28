@@ -1,107 +1,100 @@
-import * as fs from 'fs';
-import dotenv from 'dotenv';
-import eventStream from 'event-stream';
 import internal from 'stream';
-import Vinyl from 'vinyl';
-import { RequestError } from 'teeny-request';
-import { Bucket, Storage } from '@google-cloud/storage';
-import { Uploader } from '../src/index';
-
+import { Uploader } from '../src';
 import { FileState, PluginOptions } from '../src/types';
+import eventStream from 'event-stream';
+import Vinyl from 'vinyl';
 
-dotenv.config();
-
-const bucketName: string = process.env.BUCKET_NAME;
-const cacheFolder: string = './test/cache';
-const testFilePath: string = 'test/fixtures/hello.txt';
-const cacheFilePath: string = `${cacheFolder}/.gcsupload-${bucketName}`;
 const fakeFile: Vinyl.BufferFile = new Vinyl({
-  path: testFilePath,
+  path: 'test/fixtures/hello.txt',
   contents: Buffer.from('hello')
 });
 
-let pluginSettings: PluginOptions = {
-  bucketName,
-  cacheFilePath
-};
-
-beforeAll(async () => {
-  try {
-    if (fs.existsSync(cacheFolder)) {
-      // Clear all files under cache folder
-      await fs.rmdirSync(cacheFolder, { recursive: true });
+const mockedFile = {
+  upload: jest.fn().mockReturnValue({
+    metadata: {
+      md5Hash: '6t4TJUNDkcpEjYzvFwpOSg=='
     }
+  }),
+  getMetadata: jest.fn()
+};
+const mockedBucket = {
+  file: jest.fn(() => mockedFile)
+};
+const mockedStorage = {
+  bucket: jest.fn(() => mockedBucket)
+};
+jest.mock('@google-cloud/storage', () => ({
+  Storage: jest.fn(() => mockedStorage)
+}));
 
-    await Promise.all([
-      // Create a folder for cache file
-      fs.mkdirSync(cacheFolder),
-      // Make sure no test cache file exist on bucket for every full test
-      removeTestFileFromBucket()
-    ]);
-  } catch (err) {
-    console.error(err);
-  }
-});
-
-afterAll(async () => {
-  try {
-    // Clean up after all tests
-    await Promise.all([
-      fs.rmdirSync(cacheFolder, { recursive: true }),
-      removeTestFileFromBucket()
-    ]);
-  } catch (err) {
-    console.error(err);
-  }
-});
+afterEach(() => jest.clearAllMocks());
 
 describe('gulp-gcs-upload', () => {
-  test('should emit error when using invalid bucket', done => {
-    const fakeBucketName = 'fake-bucket';
-    const uploader: Uploader = new Uploader({
-      bucketName: fakeBucketName,
-      cacheFilePath: `./test/cache/.gcsupload-${fakeBucketName}`
-    });
-    const stream: internal.Transform = uploader.upload();
-    stream.on('error', (err: RequestError) => {
-      expect(err).toBeTruthy();
-      expect(err.code).toEqual(403);
-      done();
-    });
-    stream.write(fakeFile);
-    stream.end();
-  });
+  test('should emit error when missing bucket name', () =>
+    expect(() => new Uploader({} as PluginOptions)).toThrow());
 
   test('should create a new file on bucket – state: create)', done =>
     uploadTestCore('create', done));
 
-  test('should not create or update cached file to bucket – state: cache)', done =>
-    uploadTestCore('cache', done));
+  // test('should create a new file on bucket – state: create)', done => {
+  //   mockedFile.getMetadata = jest
+  //     .fn()
+  //     .mockReturnValue({ error: { code: 403 }, metadata: {} });
 
-  test('should update existing file on bucket – state: update)', done => {
-    // Remove cache file from previous test
-    fs.unlinkSync(cacheFilePath);
-    uploadTestCore('update', done);
-  });
+  //   // jest.fn(() =>
+  //   // Promise.resolve({
+  //   //   json: () => Promise.resolve({ error: { code: 403 }, metadata: {} })
+  //   // })
 
-  test('should skip updating an existing file on bucket – state: skip)', done => {
-    // Remove cache file from previous test
-    fs.unlinkSync(cacheFilePath);
+  //   // mockedFile.getMetadata = jest
+  //   // .fn()
+  //   // .mockResolvedValueOnce({ error: { code: 403 }, metadata: {} })
 
-    // `createOnly` test
-    pluginSettings = { ...pluginSettings, createOnly: true };
+  //   // const uploader: Uploader = new Uploader({
+  //   //   bucketName: 'test',
+  //   //   cacheFilePath: './test/cache/.gcsupload-test'
+  //   // });
+  //   // const stream: internal.Transform = uploader.upload();
 
-    uploadTestCore('skip', done);
-  });
+  //   // expect(mockedFile.getMetadata).toBe({ error: { code: 403 }, metadata: {} });
+
+  //   // stream.pipe(
+  //   //   eventStream.writeArray((err, files) => {
+  //   //     console.log(files);
+
+  //   //     expect(err).toBeNull();
+  //   //     expect(files).toHaveLength(1);
+  //   //     expect(files[0].gcs.state).toEqual('create');
+  //   //     done(err);
+  //   //   })
+  //   // );
+  //   // stream.write(
+  //   //   new Vinyl({
+  //   //     path: 'test/fixtures/hello.txt',
+  //   //     contents: Buffer.from('hello')
+  //   //   })
+  //   // );
+  //   // stream.end();
+  // });
 });
 
-function uploadTestCore(fileState: FileState, done: jest.DoneCallback): void {
-  const uploader: Uploader = new Uploader(pluginSettings);
+function uploadTestCore(fileState: FileState, done: jest.DoneCallback) {
+  mockedFile.getMetadata = jest
+    .fn()
+    .mockReturnValue({ error: { code: 403 }, metadata: {} });
+
+  const uploader: Uploader = new Uploader({
+    bucketName: 'test',
+    cacheFilePath: './test/cache/.gcsupload-test'
+  });
 
   const stream: internal.Transform = uploader.upload();
 
   stream.pipe(
     eventStream.writeArray((err, files) => {
+      console.log('err', err);
+      console.log('files', files);
+
       expect(err).toBeNull();
       expect(files).toHaveLength(1);
       expect(files[0].gcs.state).toEqual(fileState);
@@ -111,14 +104,4 @@ function uploadTestCore(fileState: FileState, done: jest.DoneCallback): void {
 
   stream.write(fakeFile);
   stream.end();
-}
-
-function removeTestFileFromBucket(): void {
-  const bucker: Bucket = new Storage().bucket(process.env.BUCKET_NAME);
-
-  if (bucker.file(testFilePath).exists()) {
-    bucker.file(testFilePath).delete();
-  }
-
-  return;
 }
