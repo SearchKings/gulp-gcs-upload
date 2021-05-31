@@ -10,4 +10,3 @@ tsconfig.json
 **/*.spec.*
 *.log
 **/*.tgz
-test/cache
