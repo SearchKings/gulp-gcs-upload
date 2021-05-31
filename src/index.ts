@@ -176,8 +176,6 @@ export class Uploader {
                   ...omit(uploadOptions, ['destination', 'contentType'])
                 },
                 (err, uploadedFile) => {
-                  console.log('plugin uploadedFile', uploadedFile);
-
                   if (err) {
                     return cb(err);
                   }
