@@ -134,8 +134,6 @@ export class Uploader {
           // Get file metadata from GCS
           this.client.file(file.gcs.path).getMetadata((err, remoteMetadata) => {
             // Ignore 403 and 404 errors since we're checking if a file exists on gcs
-
-            console.log('plugin metadata err', err);
             if (err && [403, 404].indexOf(err.code) < 0) {
               return cb(err);
             } else {
