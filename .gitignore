@@ -3,5 +3,4 @@ npm-debug.log
 *.map
 dist
 **/*.tgz
-.env
 test/cache/**/*
