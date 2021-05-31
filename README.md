@@ -68,7 +68,7 @@ Uploads your stream of files to the GCS bucket with optional upload options you 
 Outputs a report with the state of each file that passed through the `.upload()` stream.
 
 ```ts
-type FileState = 'cache' | 'skip' | 'update' | 'create';
+export type FileState = 'cache' | 'skip' | 'update' | 'create';
 
 interface ReportOptions {
   // List of states you wish to see included in the output
