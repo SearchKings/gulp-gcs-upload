@@ -1,0 +1,1 @@
+hello, I am uploaded by unit test from gulp-gcs-upload!
