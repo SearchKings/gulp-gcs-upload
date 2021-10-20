@@ -12,7 +12,7 @@ import colors from 'ansi-colors';
 import fancyLog from 'fancy-log';
 import internal from 'stream';
 import Vinyl from 'vinyl';
-import omit from 'lodash.omit';
+import { omit } from 'lodash';
 
 import { PluginOptions, ReportOptions } from './types';
 
@@ -173,7 +173,11 @@ export class Uploader {
                   contentType,
                   gzip: true,
                   // Omit below properties and let plugin handle it
-                  ...omit(uploadOptions, ['destination', 'contentType'])
+                  ...omit(uploadOptions, [
+                    'destination',
+                    'contentType',
+                    'metadata.contentType'
+                  ])
                 },
                 (err, uploadedFile) => {
                   if (err) {
