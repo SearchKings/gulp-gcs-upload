@@ -47,7 +47,6 @@ jobs:
     name: Semantic Release
     env:
       GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
-      SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
     steps:
       - uses: actions/checkout@v2
       - name: Semantic Release
