@@ -1,3 +1,11 @@
+## [1.0.3](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.2...v1.0.3) (2021-10-20)
+
+
+### Bug Fixes
+
+* omit missing contentType property ([#9](https://github.com/SearchKings/gulp-gcs-upload/issues/9)) ([775c8d4](https://github.com/SearchKings/gulp-gcs-upload/commit/775c8d44071d0a4c23544d383fa59f252cbf3849))
+* remove semantic-release-slack-bot ([#8](https://github.com/SearchKings/gulp-gcs-upload/issues/8)) ([3741b44](https://github.com/SearchKings/gulp-gcs-upload/commit/3741b44572b2a4bb3c91c86ddd3f00bca7e98b1b))
+
 ## [1.0.2](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.1...v1.0.2) (2021-04-26)
 
 
