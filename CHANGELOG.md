@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.3...v1.0.4) (2022-01-13)
+
+
+### Bug Fixes
+
+* update node engine ([#11](https://github.com/SearchKings/gulp-gcs-upload/issues/11)) ([c2a64b9](https://github.com/SearchKings/gulp-gcs-upload/commit/c2a64b9c1e322046e3c3f90d182db633c3da94ca))
+
 ## [1.0.3](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.2...v1.0.3) (2021-10-20)
 
 
