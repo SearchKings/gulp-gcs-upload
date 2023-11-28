@@ -1,6 +1,6 @@
 {
   "name": "@searchkings/gulp-gcs-upload",
-  "version": "1.0.5-dep-updates.0",
+  "version": "1.0.4",
   "description": "Gulp plugin to upload to Google Cloud Storage",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
