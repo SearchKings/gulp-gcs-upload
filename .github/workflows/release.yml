@@ -6,7 +6,7 @@ on:
 
 # Environment variables available to all jobs and steps in this workflow
 env:
-  NODE_VERSION: 14
+  NODE_VERSION: 18
   NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
 jobs:
