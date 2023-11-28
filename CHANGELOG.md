@@ -1,3 +1,10 @@
+## [1.0.5](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.4...v1.0.5) (2023-11-28)
+
+
+### Bug Fixes
+
+* update workflow node version ([0803916](https://github.com/SearchKings/gulp-gcs-upload/commit/0803916becaa2c30c40fb157d0980d5170d01546))
+
 ## [1.0.4](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.3...v1.0.4) (2022-01-13)
 
 
