@@ -1,3 +1,11 @@
+## [1.0.6](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.5...v1.0.6) (2024-07-03)
+
+
+### Bug Fixes
+
+* specific lts node version for Semantic release ci step ([35790af](https://github.com/SearchKings/gulp-gcs-upload/commit/35790afac8139015f10956ae31fe952d538de782))
+* update ci actions ([c735d7a](https://github.com/SearchKings/gulp-gcs-upload/commit/c735d7aad50b6b74f705189eb0a779eba4b7f0d6))
+
 ## [1.0.5](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.4...v1.0.5) (2023-11-28)
 
 
