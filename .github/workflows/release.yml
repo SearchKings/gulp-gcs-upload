@@ -52,6 +52,9 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
       - name: Semantic Release
         run: |
           npm config set //registry.npmjs.org/:_authToken ${NPM_TOKEN}
