@@ -18,10 +18,10 @@ jobs:
     name: Code Quality and Style
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Restore Cached Packages
-        uses: actions/cache@master
+        uses: actions/cache@v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{env.NODE_VERSION}}-${{ hashFiles('**/package-lock.json') }}
@@ -29,7 +29,7 @@ jobs:
             ${{ runner.os }}-node-
 
       - name: Setup Node
-        uses: actions/setup-node@master
+        uses: actions/setup-node@v4
         with:
           node-version: ${{env.NODE_VERSION}}
 
@@ -51,7 +51,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Semantic Release
         run: |
           npm config set //registry.npmjs.org/:_authToken ${NPM_TOKEN}
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Merge release to develop
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           ref: develop
           token: ${{ secrets.ACTIONS_TOKEN }}

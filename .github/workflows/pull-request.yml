@@ -15,10 +15,10 @@ jobs:
     name: Lint & Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Restore Cached Packages
-        uses: actions/cache@master
+        uses: actions/cache@v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{env.NODE_VERSION}}-${{ hashFiles('**/package-lock.json') }}
@@ -26,7 +26,7 @@ jobs:
             ${{ runner.os }}-node-
 
       - name: Setup Node
-        uses: actions/setup-node@master
+        uses: actions/setup-node@v4
         with:
           node-version: ${{env.NODE_VERSION}}
 
