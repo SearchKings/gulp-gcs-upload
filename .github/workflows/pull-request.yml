@@ -1,14 +1,12 @@
 name: Pull Request
-on:
-  pull_request:
-    types: [opened, edited, synchronize, labeled]
-  push:
-    branches:
-      - develop
+on: pull_request
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 
 # Environment variables available to all jobs and steps in this workflow
 env:
-  NODE_VERSION: 18
+  NODE_VERSION: 20.9.0
   NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
 jobs:
