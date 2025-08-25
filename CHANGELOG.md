@@ -1,3 +1,10 @@
+## [1.0.8](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.7...v1.0.8) (2025-08-25)
+
+
+### Bug Fixes
+
+* remove incorrect `ES Module` ([9a41fe2](https://github.com/SearchKings/gulp-gcs-upload/commit/9a41fe2f6606921506033ac5c92c723ac7eb2f6d))
+
 ## [1.0.7](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.6...v1.0.7) (2025-08-25)
 
 
