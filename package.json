@@ -20,7 +20,7 @@
     "lint": "npx eslint \"src/**/*.ts\"",
     "build": "npx tsc",
     "start": "npx tsc -w",
-    "test": "npx jest",
+    "test": "npx jest --config jest.config.ts",
     "prettier:all": "npx prettier --write \"**/*ts\"",
     "prettier:check:all": "npx prettier --check --config ./.prettierrc \"**/*ts\"",
     "prettier:staged": "npx pretty-quick --staged"
@@ -66,6 +66,7 @@
     "pretty-quick": "^4.2.2",
     "semantic-release": "^24.2.7",
     "ts-jest": "^29.4.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
   }
 }
