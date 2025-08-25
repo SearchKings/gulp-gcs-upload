@@ -41,7 +41,7 @@ export class Uploader {
     // Load cache
     try {
       this.fileCache = JSON.parse(fs.readFileSync(this.cacheFilePath, 'utf8'));
-    } catch (err) {
+    } catch {
       this.fileCache = {};
     }
   }

@@ -4,6 +4,7 @@
   "description": "Gulp plugin to upload to Google Cloud Storage",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "repository": "https://github.com/SearchKings/gulp-gcs-upload",
   "license": "MIT",
   "keywords": [
