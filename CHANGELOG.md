@@ -1,3 +1,10 @@
+## [1.0.7](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.6...v1.0.7) (2025-08-25)
+
+
+### Bug Fixes
+
+* retrigger release ([49f505b](https://github.com/SearchKings/gulp-gcs-upload/commit/49f505bf8b1ea07c0e0a0bf57940f689675ec49f))
+
 ## [1.0.6](https://github.com/SearchKings/gulp-gcs-upload/compare/v1.0.5...v1.0.6) (2024-07-03)
 
 
